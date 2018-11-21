@@ -1,0 +1,148 @@
+arg[1]: 'libconfutils_1.3.4.bb'
+AXIS_NAME = "libs/confutils"
+CONF
+
+SECTION = "support"
+CONF
+
+
+LICENSE = "Proprietary"
+CONF
+
+LIC_FILES_CHKSUM = "file://.axis-license;md5=6a4842bd6bc8d086023006ed4d033421"
+CONF
+
+
+DEPENDS = "filepp-native glib-2.0"
+CONF
+
+
+SRCREV = "R${PV}"
+CONF
+
+
+SRC_URI = "git://gittools.se.axis.com:29418/libs/confutils.git;protocol=ssh;nobranch=1"
+CONF
+
+
+S = "${WORKDIR}/git"
+CONF
+
+
+inherit axisbuild axislib axisunittest pkgconfig
+
+SL
+
+ITER KEY: 'SRC_URI'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '11'
+* cbb_conf_s:
+	key: 'SRC_URI'
+	val: '"git://gittools.se.axis.com:29418/libs/confutils.git;protocol=ssh;nobranch=1"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'SECTION'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '2'
+* cbb_conf_s:
+	key: 'SECTION'
+	val: '"support"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'LIC_FILES_CHKSUM'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '5'
+* cbb_conf_s:
+	key: 'LIC_FILES_CHKSUM'
+	val: '"file://.axis-license;md5=6a4842bd6bc8d086023006ed4d033421"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'SRCREV'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '9'
+* cbb_conf_s:
+	key: 'SRCREV'
+	val: '"R${PV}"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'include'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '16'
+* cbb_sl_s:
+	type: '0'
+	val: 'axisbuild axislib axisunittest pkgconfig'
+**** END GEN ****
+
+ITER KEY: 'DEPENDS'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '7'
+* cbb_conf_s:
+	key: 'DEPENDS'
+	val: '"filepp-native glib-2.0"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'AXIS_NAME'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '1'
+* cbb_conf_s:
+	key: 'AXIS_NAME'
+	val: '"libs/confutils"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'S'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '13'
+* cbb_conf_s:
+	key: 'S'
+	val: '"${WORKDIR}/git"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
+
+ITER KEY: 'LICENSE'
+**** START GEN ****
+* cbb_gen_s:
+	filename: 'libconfutils_1.3.4.bb'
+	lineno: '4'
+* cbb_conf_s:
+	key: 'LICENSE'
+	val: '"Proprietary"'
+	flag: '(null)'
+	export: '0'
+	assign_op: '7'
+**** END GEN ****
