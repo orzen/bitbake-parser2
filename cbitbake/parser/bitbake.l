@@ -11,55 +11,61 @@ gint row_num = 1;
 gint col_num = 1;
 void count();
 %}
-%option noyywrap debug
+%option noyywrap
 
 WORD [a-zA-Z0-9_\.'\$\{\}-]
 /* ES [a-zA-Z\.@/0-9_;\*-] */
-%x block
+%x BLOCK
 
 %%
 
-<block>^[\}]       { count(); BEGIN(INITIAL); return BLOCK_END; }
-<block>.           { count(); yylval.sval = g_strdup(yytext); return BLOCK_CONTENT; }
+<BLOCK>^[\}]        { count(); BEGIN(INITIAL); return BLOCK_END; }
+<BLOCK>[[:print:]]+ { count(); yylval.sval = g_strdup(yytext);
+                      return BLOCK_CONTENT; }
+<BLOCK>[[:space:][:blank:]]+  {
+                      count(); yylval.sval = g_strdup(yytext);
+                      return BLOCK_CONTENT; }
+{WORD}+[[:space:]]*"()"[[:space:]]*"{"$ {
+                      count(); yylval.sval = g_strdup(yytext); BEGIN(BLOCK);
+                      return BLOCK_START; }
 
-"python"[[:space:]]+{WORD}+[[:space:]]*"()"[[:space:]]*"{"$ {count(); printf("\nPYTHON START\n"); BEGIN(block); return PYTHON_BLOCK; }
+"#".*[\n]           { count(); }
+\"\"\"[^"]*\"\"\"   { count(); }
 
-{WORD}+[[:space:]]*"()"[[:space:]]*"{"$ {count(); printf("\nSHELL START\n"); BEGIN(block); return SHELL_BLOCK; }
+"export"            { count(); return EXPORT; }
+"inherit"           { count(); return INHERIT; }
+"include"           { count(); return INCLUDE; }
+"require"           { count(); return REQUIRE; }
+"python"            { count(); return PYTHON; }
 
-"#".*[\n]          { count(); }
-\"\"\"[^"]*\"\"\"  { count(); }
+"="                 { count(); return ASSIGN; }
+"=."                { count(); return PREDOT_ASSIGN; }
+".="                { count(); return POSTDOT_ASSIGN; }
+"=+"                { count(); return PREPEND_ASSIGN; }
+"+="                { count(); return APPEND_ASSIGN; }
+":="                { count(); return COLON_ASSIGN; }
+"?="                { count(); return QUES_ASSIGN; }
+"??="               { count(); return LAZYQUES_ASSIGN; }
 
-"export"           { count(); return EXPORT; }
-"inherit"          { count(); return INHERIT; }
-"include"          { count(); return INCLUDE; }
-"require"          { count(); return REQUIRE; }
+"\\\n"+             { count(); return STRING_CONTINUATION; }
+"\n"+               { count(); return EOL; }
 
-^[\}]              { count(); yylval.sval = g_strdup(yytext); return BLOCK_END; }
-
-"\\\n"+            { count(); return STRING_CONTINUATION; }
-"\n"+              { count(); return EOL; }
-
-"="                { count(); return ASSIGN; }
-"=."               { count(); return PREDOT_ASSIGN; }
-".="               { count(); return POSTDOT_ASSIGN; }
-"=+"               { count(); return PREPEND_ASSIGN; }
-"+="               { count(); return APPEND_ASSIGN; }
-":="               { count(); return COLON_ASSIGN; }
-"?="               { count(); return QUES_ASSIGN; }
-"??="              { count(); return LAZYQUES_ASSIGN; }
-
-[\[\]\(\)\{\}]     { count(); return yytext[0]; }
-[ \t\v\f]+         { count(); }
+[\[\]\(\)\{\}]      { count(); return yytext[0]; }
+[ \t\v\f]+          { count(); }
 
 \"(\\.|[^"])*\" |
-'(\\.|[^'])*'      { count(); yylval.sval = g_strdup(yytext); return STRING; }
-{WORD}+            { count(); yylval.sval = g_strdup(yytext); return WORD; }
+'(\\.|[^'])*'       { count(); yylval.sval = g_strdup(yytext); return STRING; }
+{WORD}+             { count(); yylval.sval = g_strdup(yytext); return WORD; }
 
-.                  { fprintf(stderr, "\nUnrecognized character '%s', '%d: %d'\n", yytext, row_num, col_num); exit(-1); }
+.                   { fprintf(stderr, "\nUnrecognized character '%s', '%d: %d'\n", yytext, row_num, col_num); exit(-1); }
 
 
 %%
 // (.|[\$\n/@,:;\*!&%\<\>])+   { count(); yylval.sval = g_strdup(yytext); return BLOCK_CONTENT; }
+
+// "python"[[:space:]]+{WORD}+[[:space:]]*"()"[[:space:]]*"{"$
+//                    { count(); BEGIN(block); return PYTHON_BLOCK; }
+//^[\}]              { count(); yylval.sval = g_strdup(yytext); return BLOCK_END; }
 
 void count() {
 	int i;

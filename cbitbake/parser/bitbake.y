@@ -45,131 +45,101 @@ void yyerror(const char *error_str);
 
 %token <ival> SINGLE_QUOTE DOUBLE_QUOTE
 %token <ival> INCLUDE INHERIT REQUIRE
-%token <sval> WORD STRING PYTHON_BLOCK SHELL_BLOCK BLOCK_CONTENT
+%token <sval> WORD STRING BLOCK_START BLOCK_CONTENT
 
 %token EXPORT PYTHON
 %token PREDOT_ASSIGN POSTDOT_ASSIGN PREPEND_ASSIGN APPEND_ASSIGN
 %token COLON_ASSIGN QUES_ASSIGN LAZYQUES_ASSIGN ASSIGN
 %token EOL STRING_CONTINUATION BLOCK_END
 
-%type <ival> assign_op quote
-%type <sval> block_expr block_term conf_expr kw_expr
-
-%type <list> statements
+%type <ival> assign_op
+%type <sval> block_expr kw_expr
+%type <list> recipe statements
 %type <hashtable> statement conf_stmt kw_keyword kw_stmt block_stmt
 
 %start recipe
 
 %destructor { printf("\nfree sval\n"); g_free($$); $$ = NULL; } <sval>
-/*
 %destructor { g_list_free_full($$, (GDestroyNotify) g_hash_table_unref); $$ = NULL; } <list>
+
+/*
 %destructor { g_hash_table_unref($$); $$ = NULL; } <hashtable>
 */
 
 %%
 
 recipe:
-	statements
+	statements { $$ = $1; }
 	;
 
 statements:
-	statement EOL {printf("\n%d\n", __LINE__);printf("\nstmt1\n"); }
-	| statement EOL statements {printf("\n%d\n", __LINE__);printf("\nstmt2\n"); }
+	statement EOL { $$ = g_list_append(NULL, $1); }
+	| statement EOL statements { $$ = g_list_append($3, $1); }
 	;
 
 statement:
 	/* Single line */
-	block_stmt {printf("\n%d\n", __LINE__); printf("\nBLOCK '%d'\n", row_num); $$ = $1; }
-	| conf_stmt {printf("\n%d\n", __LINE__); printf("\nCONF '%d'\n", row_num); $$ = $1;  }
-	| kw_stmt {printf("\n%d\n", __LINE__); printf("\nKW '%d'\n", row_num); $$ = $1; }
+	block_stmt { $$ = $1; }
+	| conf_stmt { $$ = $1; }
+	| kw_stmt { $$ = $1; }
 	;
 
 block_stmt:
-	SHELL_BLOCK block_expr BLOCK_END {
+	BLOCK_START block_expr BLOCK_END {
 		$$ = new(block);
 		block_set($$, $1, $2, 0); }
-	| PYTHON_BLOCK block_expr BLOCK_END {
+	| PYTHON BLOCK_START block_expr BLOCK_END {
 		$$ = new(block);
-		block_set($$, $1, $2, 1); }
-	| WORD '(' ')' '{' block_expr BLOCK_END {printf("\n%d\n", __LINE__);
-		$$ = new(block);
-		block_set($$, $1, $5, 0); }
-	| PYTHON WORD '(' ')' '{' block_expr BLOCK_END {printf("\n%d\n", __LINE__);
-		$$ = new(block);
-		block_set($$, $2, $6, 1); }
+		block_set($$, $2, $3, 1); }
 	;
 
 block_expr:
-	block_term { $$ = $1; }
-	| block_term block_expr {
-		$$ = g_strdup_printf("%s%s", $1, $2);
-		g_free($1); g_free($2); }
-	;
-
-block_term:
-	EOL { $$ = "\n"; }
-	| '(' { $$ = "("; }
-	| ')' { $$ = ")"; }
-	| '{' { $$ = "{"; }
-	| '}' {$$ = "}"; }
-	| '[' { $$ = "["; }
-	| ']' {$$ = "]"; }
-	| STRING { $$ = $1; }
-	| WORD { $$ = $1; }
-	| BLOCK_CONTENT { $$ = $1; }
+	BLOCK_CONTENT { $$ = $1; }
+	| BLOCK_CONTENT block_expr {
+		$$ = g_strdup_printf("%s%s", $1, $2); }
 	;
 
 conf_stmt:
-	WORD assign_op STRING {printf("\n%d\n", __LINE__);
+	WORD assign_op STRING {
 		$$ = new(conf);
 		conf_set($$, $1, $3, NULL, $2, 0); }
-	| EXPORT WORD assign_op STRING {printf("\n%d\n", __LINE__);
+	| EXPORT WORD assign_op STRING {
 		$$ = new(conf);
 		conf_set($$, $2, $4, NULL, $3, 1); }
-	| WORD '[' WORD ']' assign_op STRING {printf("\n%d\n", __LINE__);
+	| WORD '[' WORD ']' assign_op STRING {
 		$$ = new(conf);
 		conf_set($$, $1, $6, $3, $5, 0); }
-	| EXPORT WORD '[' WORD ']' assign_op STRING {printf("\n%d\n", __LINE__);
+	| EXPORT WORD '[' WORD ']' assign_op STRING {
 		$$ = new(conf);
 		conf_set($$, $2, $7, $4, $6, 1); }
 	;
 
-conf_expr:
-	STRING {printf("\n%d\n", __LINE__); $$ = $1; }
-	| STRING conf_expr {printf("\n%d\n", __LINE__); $$ = g_strdup_printf("%s %s", $1, $2); }
-	;
-
 assign_op:
-	PREDOT_ASSIGN {printf("\n%d\n", __LINE__); $$ = predot_assign; }
-	| POSTDOT_ASSIGN {printf("\n%d\n", __LINE__); $$ = postdot_assign; }
-	| PREPEND_ASSIGN {printf("\n%d\n", __LINE__); $$ = prepend_assign; }
-	| APPEND_ASSIGN {printf("\n%d\n", __LINE__); $$ = append_assign; }
-	| COLON_ASSIGN {printf("\n%d\n", __LINE__); $$ = colon_assign; }
-	| QUES_ASSIGN {printf("\n%d\n", __LINE__); $$ = ques_assign; }
-	| LAZYQUES_ASSIGN {printf("\n%d\n", __LINE__); $$ = lazyques_assign; }
-	| ASSIGN {printf("\n%d\n", __LINE__); $$ = assign; }
+	PREDOT_ASSIGN { $$ = predot_assign; }
+	| POSTDOT_ASSIGN { $$ = postdot_assign; }
+	| PREPEND_ASSIGN { $$ = prepend_assign; }
+	| APPEND_ASSIGN { $$ = append_assign; }
+	| COLON_ASSIGN { $$ = colon_assign; }
+	| QUES_ASSIGN { $$ = ques_assign; }
+	| LAZYQUES_ASSIGN { $$ = lazyques_assign; }
+	| ASSIGN { $$ = assign; }
 	;
 
 kw_stmt:
-	kw_keyword kw_expr {printf("\n%d\n", __LINE__); $$ = add_str($1, "expr", $2); }
+	kw_keyword kw_expr { $$ = add_str($1, "expr", $2); }
 	;
 
 kw_keyword:
-	INCLUDE {printf("\n%d\n", __LINE__);
-		$$ = new(kw);
-		add_int($$, "keyword", $1); }
-	| INHERIT {printf("\n%d\n", __LINE__);
-		$$ = new(kw);
-		add_int($$, "keyword", $1); }
-	| REQUIRE {printf("\n%d\n", __LINE__);
-		$$ = new(kw);
-		add_int($$, "keyword", $1); }
+	INCLUDE { $$ = new(kw); add_int($$, "keyword", $1); }
+	| INHERIT { $$ = new(kw); add_int($$, "keyword", $1); }
+	| REQUIRE { $$ = new(kw); add_int($$, "keyword", $1); }
 	;
 
 kw_expr:
-	WORD {printf("\n%d\n", __LINE__); $$ = g_strdup($1); }
-	| WORD kw_expr {printf("\n%d\n", __LINE__); g_free($$); $$ = g_strdup_printf("%s %s", $1, $2); }
-	| WORD STRING_CONTINUATION kw_expr {printf("\n%d\n", __LINE__); g_free($$); $$ = g_strdup_printf("%s %s", $1, $3); }
+	WORD { $$ = g_strdup($1); }
+	| WORD kw_expr { g_free($$); $$ = g_strdup_printf("%s %s", $1, $2); }
+	| WORD STRING_CONTINUATION kw_expr {
+		g_free($$); $$ = g_strdup_printf("%s %s", $1, $3); }
 	;
 
 %%
