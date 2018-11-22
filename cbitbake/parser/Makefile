@@ -1,9 +1,9 @@
 PROG = cbitbake
 
-BISON_SRC = bitbake.y
-BISON_GEN = bitbake.tab.c bitbake.tab.h
+BISON_SRC = parser.y
+BISON_GEN = parser.tab.c parser.tab.h
 
-LEX_SRC = bitbake.l
+LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
 SRCS = $(BISON_GEN) $(LEX_GEN) args.c files.c parser_types.c utils.c utils2.c

@@ -4,8 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bitbake.tab.h"
-#include "parser_types.h"
+#include "parser.tab.h"
 
 gint row_num = 1;
 gint col_num = 1;
