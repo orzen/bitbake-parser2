@@ -10,7 +10,7 @@ gint row_num = 1;
 gint col_num = 1;
 void count();
 %}
-%option noyywrap
+%option noyywrap debug
 
 WORD [a-zA-Z0-9_\.'\$\{\}-]
 /* ES [a-zA-Z\.@/0-9_;\*-] */

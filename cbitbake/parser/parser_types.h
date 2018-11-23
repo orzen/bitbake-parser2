@@ -29,6 +29,7 @@ enum kw_type {
 	require
 };
 
+#if 0
 struct cbb_conf_s {
 	gchar *key;
 	gchar *val;
@@ -71,5 +72,6 @@ void cbb_block_s_print(struct cbb_block_s *block);
 struct cbb_gen_s* cbb_gen_s_new();
 void cbb_gen_s_free(struct cbb_gen_s *gen);
 void cbb_gen_s_print(struct cbb_gen_s *gen);
+#endif
 
 #endif

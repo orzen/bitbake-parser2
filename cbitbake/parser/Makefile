@@ -6,7 +6,7 @@ BISON_GEN = parser.tab.c parser.tab.h
 LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
-SRCS = $(BISON_GEN) $(LEX_GEN) args.c files.c parser_types.c utils.c utils2.c
+SRCS = $(BISON_GEN) $(LEX_GEN) args.c files.c utils.c
 
 PKGS = glib-2.0
 
@@ -28,4 +28,4 @@ $(BISON_GEN): $(BISON_SRC)
 	bison --report=state -d $(BISON_SRC)
 
 clean:
-	rm $(GENERATED) $(PROG)
+	rm $(GENERATED) $(PROG) parser.output

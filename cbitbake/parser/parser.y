@@ -7,7 +7,6 @@
 #include "files.h"
 #include "parser_types.h"
 #include "utils.h"
-#include "utils2.h"
 
 extern int yylex();
 extern int yyparse();
@@ -15,20 +14,17 @@ extern FILE *yyin;
 extern int row_num;
 extern int col_num;
 
-GHashTable *parse_tree;
 gchar *filename;
-struct cbb_gen_s *cur_gen;
-struct cbb_conf_s *cur_conf;
-struct cbb_kw_s *cur_kw;
-struct cbb_block_s *cur_block;
 
-void yyerror(const char *error_str);
+void yyerror(GList *acc, const gchar *error_str);
 
 %}
 
 %code requires {
 #include <glib.h>
 }
+
+%parse-param {GList *acc}
 
 /*
 %define api.value.type {union YYSTYPE}
@@ -96,7 +92,9 @@ block_stmt:
 block_expr:
 	BLOCK_CONTENT { $$ = $1; }
 	| BLOCK_CONTENT block_expr {
-		$$ = g_strdup_printf("%s%s", $1, $2); }
+		g_free($$);
+		$$ = g_strdup_printf("%s%s", $1, $2);
+		g_free($1); g_free($2);}
 	;
 
 conf_stmt:
@@ -144,13 +142,14 @@ kw_expr:
 
 %%
 
-void yyerror(const char *error_str) {
+void yyerror(GList *acc, const gchar *error_str) {
 	printf("\nParse error at '%d: %d': '%s'\n", ++row_num, ++col_num,
 	       error_str);
 	exit(-1);
 }
 
 void parse_file(const gchar *fn) {
+	GList *acc = NULL;
 	FILE *file = NULL;
 	int r = -1;
 
@@ -165,28 +164,20 @@ void parse_file(const gchar *fn) {
 		cbb_fail("Failed to duplicate string!");
 	}
 
-	parse_tree = g_hash_table_new_full(g_str_hash,
-	                                   g_str_equal,
-	                                   g_free,
-	                                   (GDestroyNotify) cbb_gen_s_free);
 	yyin = file;
 
 	do {
-		yyparse();
+		r = yyparse(acc);
+		if (r < 0) {
+			cbb_fail("Failed to parse!");
+		}
 	} while (!feof(yyin));
 
-	GHashTableIter iter;
-	gpointer key, val;
-	g_hash_table_iter_init(&iter, parse_tree);
-	while (g_hash_table_iter_next (&iter, &key, &val)) {
-		printf("\nITER KEY: '%s'\n", (gchar *) key);
-		cbb_gen_s_print(val);
-	}
+	//BEGIN(0);
+	//YY_FLUSH_BUFFER;
 
 	fclose(file);
 	file = NULL;
-	g_hash_table_unref(parse_tree);
-	parse_tree = NULL;
 }
 
 int main(int argc, char **argv) {

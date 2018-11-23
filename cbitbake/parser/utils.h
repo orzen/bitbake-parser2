@@ -3,23 +3,25 @@
 
 #include <glib.h>
 
-#define cbb_fail(msg) _cbb_fail(__func__, __LINE__, msg)
-void _cbb_fail(const gchar *func, gint line, const gchar *msg);
+#include "parser_types.h"
 
-void append_entry();
+#define cbb_fail(format, ...) _cbb_fail("FAILED: %s[%d]: " format "\n", __func__, __LINE__, ##__VA_ARGS__)
+void _cbb_fail(const gchar *format, ...);
 
-void conf_set2(const gchar *key,
+void conf_set(GHashTable *table,
+              const gchar *key,
               const gchar *val,
               const gchar *flag,
               enum assign_op op,
-              enum quote_type quote,
-              gboolean export);
+              gint export);
 
-gchar* sl_keyword_itoa(gint keyword);
-void sl_set(gint keyword, const gchar *val);
+void block_set(GHashTable *table,
+               const gchar *key,
+               const gchar *expr,
+               gint python);
 
-void block_set2(const gchar *name, const gchar *expr, gboolean python);
-
-void append_entry();
+GHashTable* add_str(GHashTable *table, const gchar *key, const gchar *val);
+GHashTable* add_int(GHashTable *table, const gchar *key, gint val);
+GHashTable* new(enum parser_type type);
 
 #endif
