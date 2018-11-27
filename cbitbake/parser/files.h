@@ -1,8 +1,9 @@
-#ifndef _FILES_H_
-#define _FILES_H_
+#ifndef FILES_H
+#define FILES_H
 
-int files_read_file(const char *filename,
-                    char **read_buffer,
-                    size_t *buffer_size);
+#include <stdio.h>
+
+int cbb_open_file(const char *filename, FILE **fd);
+
 
 #endif

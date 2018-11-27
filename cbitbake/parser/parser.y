@@ -1,43 +1,25 @@
 %{
 #include <stdio.h>
-#include <stdlib.h>
 #include <glib.h>
 
 #include "args.h"
 #include "files.h"
+#include "lexer.h"
 #include "parser_types.h"
 #include "utils.h"
-
-extern int yylex();
-extern int yyparse();
-extern FILE *yyin;
-extern int row_num;
-extern int col_num;
-
-gchar *filename;
-
-void yyerror(GList *acc, const gchar *error_str);
-
 %}
+
+%define api.pure full
+%define parse.error verbose
 
 %code requires {
 #include <glib.h>
+#include "lexer.h"
 }
+%verbose
 
-%parse-param {GList *acc}
-
-/*
-%define api.value.type {union YYSTYPE}
-*/
-%define parse.error verbose
-%define parse.trace
-
-%union {
-	gint ival;
-	gchar *sval;
-	GHashTable *hashtable;
-	GList *list;
-}
+%lex-param {yyscan_t yyscanner}
+%parse-param {yyscan_t yyscanner} {GList **acc}
 
 %token <ival> SINGLE_QUOTE DOUBLE_QUOTE
 %token <ival> INCLUDE INHERIT REQUIRE
@@ -55,17 +37,17 @@ void yyerror(GList *acc, const gchar *error_str);
 
 %start recipe
 
-%destructor { printf("\nfree sval\n"); g_free($$); $$ = NULL; } <sval>
-%destructor { g_list_free_full($$, (GDestroyNotify) g_hash_table_unref); $$ = NULL; } <list>
-
 /*
-%destructor { g_hash_table_unref($$); $$ = NULL; } <hashtable>
+%destructor { printf("\nfreeing\n"); g_free($$); $$ = NULL; } <sval>
+%destructor { g_list_free_full($$, (GDestroyNotify) g_hash_table_unref); $$ = NULL; } <list>
 */
 
 %%
 
 recipe:
-	statements { $$ = $1; }
+	statements { *acc = g_list_copy($1); $$ = $1;
+	printf("\nLENGTH '%d'\n", g_list_length($1));
+	}
 	;
 
 statements:
@@ -92,7 +74,6 @@ block_stmt:
 block_expr:
 	BLOCK_CONTENT { $$ = $1; }
 	| BLOCK_CONTENT block_expr {
-		g_free($$);
 		$$ = g_strdup_printf("%s%s", $1, $2);
 		g_free($1); g_free($2);}
 	;
@@ -135,56 +116,9 @@ kw_keyword:
 
 kw_expr:
 	WORD { $$ = g_strdup($1); }
-	| WORD kw_expr { g_free($$); $$ = g_strdup_printf("%s %s", $1, $2); }
+	| WORD kw_expr { $$ = g_strdup_printf("%s %s", $1, $2); }
 	| WORD STRING_CONTINUATION kw_expr {
-		g_free($$); $$ = g_strdup_printf("%s %s", $1, $3); }
+		$$ = g_strdup_printf("%s %s", $1, $3); }
 	;
 
 %%
-
-void yyerror(GList *acc, const gchar *error_str) {
-	printf("\nParse error at '%d: %d': '%s'\n", ++row_num, ++col_num,
-	       error_str);
-	exit(-1);
-}
-
-void parse_file(const gchar *fn) {
-	GList *acc = NULL;
-	FILE *file = NULL;
-	int r = -1;
-
-	r = cbb_open_file(fn, &file);
-	if (r < 0) {
-		cbb_fail("Failed to open file!");
-	}
-
-	g_free(filename);
-	filename = g_strdup(fn);
-	if (filename == NULL) {
-		cbb_fail("Failed to duplicate string!");
-	}
-
-	yyin = file;
-
-	do {
-		r = yyparse(acc);
-		if (r < 0) {
-			cbb_fail("Failed to parse!");
-		}
-	} while (!feof(yyin));
-
-	//BEGIN(0);
-	//YY_FLUSH_BUFFER;
-
-	fclose(file);
-	file = NULL;
-}
-
-int main(int argc, char **argv) {
-	int i = 0;
-
-	for (i = 1; i < argc; i++) {
-		printf("arg[%d]: '%s'\n", i, argv[i]);
-		parse_file(argv[i]);
-	}
-}

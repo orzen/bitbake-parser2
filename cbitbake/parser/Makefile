@@ -6,7 +6,7 @@ BISON_GEN = parser.tab.c parser.tab.h
 LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
-SRCS = $(BISON_GEN) $(LEX_GEN) args.c files.c utils.c
+SRCS = $(BISON_GEN) $(LEX_GEN) files.c main.c utils.c
 
 PKGS = glib-2.0
 
@@ -22,7 +22,7 @@ all: $(LEX)
 	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(PROG)
 
 $(LEX): $(LEX_SRC) $(BISON_GEN)
-	flex $(LEX_SRC)
+	flex --bison-bridge --reentrant $(LEX_SRC)
 
 $(BISON_GEN): $(BISON_SRC)
 	bison --report=state -d $(BISON_SRC)

@@ -4,7 +4,7 @@
 #include "utils.h"
 
 extern gchar *filename;
-extern gint yylineno;
+extern gint row_num;
 
 void _cbb_fail(const gchar *format, ...) {
 	va_list ap;
@@ -76,7 +76,8 @@ GHashTable* new(enum parser_type type) {
 	}
 
 	lineno = calloc(1, sizeof(gint));
-	*lineno = yylineno;
+	printf("\nrow_num '%d'\n", row_num);
+	*lineno = row_num;
 
 	r = g_hash_table_insert(tmp, g_strdup("lineno"), lineno);
 	if (r != TRUE) {
