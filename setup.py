@@ -41,15 +41,16 @@ def find_extensions():
 
 version = '0.0.1'
 
-if __name__ == '__main__':
-    ext = find_extensions()
-    print("EXT '{}'".format(str(ext)))
+#if __name__ == '__main__':
+#    ext = find_extensions()
+#    print("EXT '{}'".format(str(ext)))
 
 #parser = Extension('cbitbake/parser',
 #                   sources = ['cbitbake'])
 #
 #
-#setup(name = 'cbitbake',
-#      version = version,
-#      description = 'C implementation of bitbake parser',
-#      ext_modules = [])
+
+setup(name = 'cbitbake',
+      version = version,
+      description = 'C implementation of bitbake parser',
+      ext_modules = find_extensions())

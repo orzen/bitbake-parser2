@@ -27,5 +27,8 @@ $(LEX): $(LEX_SRC) $(BISON_GEN)
 $(BISON_GEN): $(BISON_SRC)
 	bison --report=state -d $(BISON_SRC)
 
+$(SETUP_PY): $(LEX)
+	python3 setup.py build_ext
+
 clean:
 	rm $(GENERATED) $(PROG) parser.output

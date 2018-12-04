@@ -1,9 +1,55 @@
 #include <errno.h>
+#include <glib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+gchar** cbb_split_extension(const gchar *filename) {
+	gchar **result = NULL;
+	gchar *tmp = NULL;
+	gchar *delimiter = NULL;
+
+	if (filename == NULL) {
+		return NULL;
+	}
+
+	tmp = g_strdup(filename);
+
+	delimiter = strrchr(tmp, '.');
+	if (delimiter == NULL) {
+		g_free(tmp);
+		return NULL;
+	}
+
+	result = calloc(2, sizeof(gchar));
+
+	// Copy extension
+	result[1] = g_strdup(delimiter);
+	if (result[1] == NULL) {
+		g_free(tmp);
+		g_free(result);
+
+		return NULL;
+	}
+
+	// Copy filename without extension
+	*delimiter = '\0';
+	result[0] = g_strdup(tmp);
+	*delimiter = '.';
+	if (result[0] == NULL) {
+		g_free(tmp);
+		g_free(result[1]);
+		g_free(result);
+
+		return NULL;
+	}
+
+	g_free(tmp);
+
+	return result;
+}
 
 int cbb_is_regular_file(const char *file_path) {
 	int r = -1;
