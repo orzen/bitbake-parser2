@@ -4,7 +4,6 @@
 
 #include "args.h"
 #include "files.h"
-#include "lexer.h"
 #include "parser_types.h"
 #include "utils.h"
 %}
@@ -22,18 +21,20 @@
 %parse-param {yyscan_t yyscanner} {GList **acc}
 
 %token <ival> SINGLE_QUOTE DOUBLE_QUOTE
-%token <ival> INCLUDE INHERIT REQUIRE
-%token <sval> WORD STRING BLOCK_START BLOCK_CONTENT
+%token <ival> DELTASK EXPORT EXPORT_FUNCTIONS INCLUDE INHERIT REQUIRE
+%token <sval> WORD STRING BLOCK_START BLOCK_CONTENT ADDTASK_CONTENT
 
-%token EXPORT PYTHON
+%token ADDTASK ADDTASK_AFTER ADDTASK_BEFORE ADDTASK_END
+%token FAKEROOT PYTHON
 %token PREDOT_ASSIGN POSTDOT_ASSIGN PREPEND_ASSIGN APPEND_ASSIGN
-%token COLON_ASSIGN QUES_ASSIGN LAZYQUES_ASSIGN ASSIGN
+       COLON_ASSIGN QUES_ASSIGN LAZYQUES_ASSIGN ASSIGN
 %token EOL STRING_CONTINUATION BLOCK_END
 
 %type <ival> assign_op
 %type <sval> block_expr kw_expr
 %type <list> recipe statements
-%type <hashtable> statement conf_stmt kw_keyword kw_stmt block_stmt
+%type <hashtable> addtask_stmt addtask_expr block_stmt conf_stmt export_stmt statement
+                  kw_keyword kw_stmt
 
 %start recipe
 
@@ -60,15 +61,33 @@ statement:
 	block_stmt { $$ = $1; }
 	| conf_stmt { $$ = $1; }
 	| kw_stmt { $$ = $1; }
+	| addtask_stmt { $$ = $1; }
+	| export_stmt { $$ = $1; }
+	;
+
+export_stmt:
+	EXPORT conf_stmt {
+		$$ = add_int($2, "export", 1); }
+	| EXPORT kw_expr {
+		$$ = new(kw);
+		add_int($$, "keyword", $1);
+		add_str($$, "expr", $2);
+		add_int($$, "export", 1); }
 	;
 
 block_stmt:
 	BLOCK_START block_expr BLOCK_END {
 		$$ = new(block);
-		block_set($$, $1, $2, 0); }
+		block_set($$, $1, $2, 0, 0); }
+	| FAKEROOT BLOCK_START block_expr BLOCK_END {
+		$$ = new(block);
+		block_set($$, $2, $3, 1, 0); }
 	| PYTHON BLOCK_START block_expr BLOCK_END {
 		$$ = new(block);
-		block_set($$, $2, $3, 1); }
+		block_set($$, $2, $3, 0, 1); }
+	| FAKEROOT PYTHON BLOCK_START block_expr BLOCK_END {
+		$$ = new(block);
+		block_set($$, $3, $4, 1, 1); }
 	;
 
 block_expr:
@@ -81,16 +100,10 @@ block_expr:
 conf_stmt:
 	WORD assign_op STRING {
 		$$ = new(conf);
-		conf_set($$, $1, $3, NULL, $2, 0); }
-	| EXPORT WORD assign_op STRING {
-		$$ = new(conf);
-		conf_set($$, $2, $4, NULL, $3, 1); }
+		conf_set($$, $1, $3, NULL, $2); }
 	| WORD '[' WORD ']' assign_op STRING {
 		$$ = new(conf);
-		conf_set($$, $1, $6, $3, $5, 0); }
-	| EXPORT WORD '[' WORD ']' assign_op STRING {
-		$$ = new(conf);
-		conf_set($$, $2, $7, $4, $6, 1); }
+		conf_set($$, $1, $6, $3, $5); }
 	;
 
 assign_op:
@@ -105,20 +118,34 @@ assign_op:
 	;
 
 kw_stmt:
-	kw_keyword kw_expr { $$ = add_str($1, "expr", $2); }
+	kw_keyword kw_expr {
+		$$ = add_str($1, "expr", $2);
+		add_int($$, "export", 0); }
 	;
 
 kw_keyword:
-	INCLUDE { $$ = new(kw); add_int($$, "keyword", $1); }
+	DELTASK { $$ = new(kw); add_int($$, "keyword", $1); }
+	| EXPORT_FUNCTIONS { $$ = new(kw); add_int($$, "keyword", $1); }
+	| INCLUDE { $$ = new(kw); add_int($$, "keyword", $1); }
 	| INHERIT { $$ = new(kw); add_int($$, "keyword", $1); }
 	| REQUIRE { $$ = new(kw); add_int($$, "keyword", $1); }
 	;
 
 kw_expr:
-	WORD { $$ = g_strdup($1); }
+	WORD { $$ = $1; }
 	| WORD kw_expr { $$ = g_strdup_printf("%s %s", $1, $2); }
 	| WORD STRING_CONTINUATION kw_expr {
 		$$ = g_strdup_printf("%s %s", $1, $3); }
+	;
+
+addtask_stmt:
+	ADDTASK addtask_expr ADDTASK_END { $$ = $2; }
+	;
+
+addtask_expr:
+	ADDTASK_CONTENT { $$ = new(addtask); add_str($$, "content", $1); }
+	| addtask_expr ADDTASK_AFTER ADDTASK_CONTENT { add_str($1, "after", $3); }
+	| addtask_expr ADDTASK_BEFORE ADDTASK_CONTENT { add_str($1, "before", $3); }
 	;
 
 %%

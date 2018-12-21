@@ -22,25 +22,51 @@ gchar* duptext(yyscan_t scanner);
 WORD [a-zA-Z0-9_\.'\$\{\}-]
 
 %x BLOCK
+%x ADDTASK
 
 %%
 
-<BLOCK>^[\}]        { count(yyscanner); yy_pop_state(yyscanner); return BLOCK_END; }
-<BLOCK>[[:print:]]+ { count(yyscanner); yylval->sval = duptext(yyscanner); return BLOCK_CONTENT; }
-<BLOCK>[[:space:][:blank:]]+ { count(yyscanner); yylval->sval = duptext(yyscanner); return BLOCK_CONTENT; }
+<BLOCK>^[\}]        { count(yyscanner);
+                      yy_pop_state(yyscanner);
+                      return BLOCK_END; }
+<BLOCK>[[:print:]]+ { count(yyscanner);
+                      yylval->sval = duptext(yyscanner);
+                      return BLOCK_CONTENT; }
+<BLOCK>[[:space:][:blank:]]+ {
+                      count(yyscanner);
+                      yylval->sval = duptext(yyscanner);
+                      return BLOCK_CONTENT; }
 {WORD}+[[:space:]]*"()"[[:space:]]*"{"$ {
-                      count(yyscanner); yylval->sval = duptext(yyscanner);
+                      count(yyscanner);
+                      yylval->sval = duptext(yyscanner);
                       yy_push_state(BLOCK, yyscanner);
                       return BLOCK_START; }
+
+<ADDTASK>"after"      { count(yyscanner); return ADDTASK_AFTER; }
+<ADDTASK>"before"     { count(yyscanner); return ADDTASK_BEFORE; }
+<ADDTASK>\n           { count(yyscanner);
+                      yy_pop_state(yyscanner);
+                      return ADDTASK_END; }
+<ADDTASK>[[:space:]]+ { count(yyscanner); }
+<ADDTASK>[[:print:]]+ { count(yyscanner);
+                      yylval->sval = duptext(yyscanner);
+                      return ADDTASK_CONTENT; }
+"addtask"           { count(yyscanner);
+                      yy_push_state(ADDTASK, yyscanner);
+                      return ADDTASK; }
 
 "#".*[\n]           { count(yyscanner); }
 \"\"\"[^"]*\"\"\"   { count(yyscanner); }
 
-"export"            { count(yyscanner); return EXPORT; }
-"inherit"           { count(yyscanner); return INHERIT; }
-"include"           { count(yyscanner); return INCLUDE; }
-"require"           { count(yyscanner); return REQUIRE; }
+"fakeroot"          { count(yyscanner); return FAKEROOT; }
 "python"            { count(yyscanner); return PYTHON; }
+
+"deltask"           { count(yyscanner); yylval->ival = deltask; return DELTASK; }
+"export"            { count(yyscanner); yylval->ival = export_var; return EXPORT; }
+"EXPORT_FUNCTIONS"  { count(yyscanner); yylval->ival = export_fun; return EXPORT_FUNCTIONS; }
+"inherit"           { count(yyscanner); yylval->ival = inherit; return INHERIT; }
+"include"           { count(yyscanner); yylval->ival = include; return INCLUDE; }
+"require"           { count(yyscanner); yylval->ival = require; return REQUIRE; }
 
 "="                 { count(yyscanner); return ASSIGN; }
 "=."                { count(yyscanner); return PREDOT_ASSIGN; }
@@ -140,9 +166,9 @@ void yyerror(yyscan_t yyscanner, GList **acc, const gchar *error_str) {
 	exit(-1);
 }
 
-void parse_file(const gchar *fn) {
+GList* cbb_parse_file(const gchar *fn) {
 	yyscan_t scanner;
-	GList *foo = NULL;
+	GList *acc = NULL;
 	FILE *file = NULL;
 	int r = -1;
 
@@ -164,27 +190,19 @@ void parse_file(const gchar *fn) {
 
 	yyset_in(file, scanner);
 
-	r = yyparse(scanner, &foo);
+	r = yyparse(scanner, &acc);
 	if (r < 0) {
 		cbb_fail("Failed to parse!");
-	}
-
-	if (foo == NULL) {
-		printf("acc is NULL\n");
-	} else {
-		printf("acc is _NOT_ NULL\n");
-	}
-
-	GList *iter;
-	for(iter = foo; g_list_next(iter) != NULL; iter = g_list_next(iter)) {
-		GHashTable *tbl = iter->data;
-		gchar *fname = g_hash_table_lookup(tbl, "filename");
-		gint *lineno = g_hash_table_lookup(tbl, "lineno");
-		printf("filename '%s', lineno '%d'\n", fname, *lineno);
 	}
 
 	fclose(file);
 	file = NULL;
 
 	yylex_destroy(scanner);
+
+	if (acc == NULL) {
+		g_warning("acc is NULL\n");
+	} 
+
+	return acc;
 }

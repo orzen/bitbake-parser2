@@ -5,6 +5,7 @@ enum parser_type {
 	block = 0,
 	conf,
 	kw,
+	addtask,
 };
 
 enum assign_op {
@@ -24,7 +25,10 @@ enum quote_type {
 };
 
 enum kw_type {
-	include = 0,
+	deltask = 0,
+	export_var,
+	export_fun,
+	include,
 	inherit,
 	require
 };

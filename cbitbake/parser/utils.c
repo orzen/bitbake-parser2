@@ -34,7 +34,6 @@ gchar* kw_keyword_itoa(gint keyword) {
 	return tmp;
 }
 
-
 GHashTable* add_str(GHashTable *table, const gchar *key, const gchar *val) {
 	gboolean r = FALSE;
 
@@ -76,7 +75,6 @@ GHashTable* new(enum parser_type type) {
 	}
 
 	lineno = calloc(1, sizeof(gint));
-	printf("\nrow_num '%d'\n", row_num);
 	*lineno = row_num;
 
 	r = g_hash_table_insert(tmp, g_strdup("lineno"), lineno);
@@ -99,8 +97,7 @@ void conf_set(GHashTable *table,
               const gchar *key,
               const gchar *val,
               const gchar *flag,
-              enum assign_op op,
-              gint export) {
+              enum assign_op op) {
 	enum quote_type quote = single_quote;
 	if (val[0] == '"') {
 		quote = double_quote;
@@ -111,14 +108,19 @@ void conf_set(GHashTable *table,
 	add_str(table, "flag", flag);
 	add_int(table, "quote", quote);
 	add_int(table, "op", op);
-	add_int(table, "export", export);
 }
 
 void block_set(GHashTable *table,
                const gchar *key,
                const gchar *expr,
+               gint fakeroot,
                gint python) {
+	if (table == NULL || key == NULL || expr == NULL) {
+		cbb_fail("empty pointer args");
+	}
+
 	add_str(table, "key", key);
 	add_str(table, "expr", expr);
+	add_int(table, "fakeroot", fakeroot);
 	add_int(table, "python", python);
 }

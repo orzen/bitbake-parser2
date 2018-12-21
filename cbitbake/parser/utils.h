@@ -12,12 +12,12 @@ void conf_set(GHashTable *table,
               const gchar *key,
               const gchar *val,
               const gchar *flag,
-              enum assign_op op,
-              gint export);
+              enum assign_op op);
 
 void block_set(GHashTable *table,
                const gchar *key,
                const gchar *expr,
+               gint fakeroot,
                gint python);
 
 GHashTable* add_str(GHashTable *table, const gchar *key, const gchar *val);
