@@ -15,147 +15,151 @@ TYPE_NEW(block)
 TYPE_NEW(gen)
 #undef TYPE_NEW
 
-void cbb_conf_s_free(struct cbb_conf_s *conf) {
-	if (conf == NULL) {
-		return;
-	}
-
-	if (conf->key != NULL) {
-		g_free(conf->key);
-	}
-
-	if (conf->val != NULL) {
-		g_free(conf->val);
-	}
-
-	if (conf->flag != NULL) {
-		g_free(conf->flag);
-	}
-
-	conf = NULL;
+gchar* cbb_types_assign_op_itoa(enum assign_op op) {
+	switch(op) {
+	case predot_assign:
+		return g_strdup("predot");
+		break;
+	case postdot_assign:
+		return g_strdup("postdot");
+		break;
+	case prepend_assign:
+		return g_strdup("prepend");
+		break;
+	case append_assign:
+		return g_strdup("append");
+		break;
+	case colon_assign:
+		return g_strdup("colon");
+		break;
+	case ques_assign:
+		return g_strdup("ques");
+		break;
+	case lazyques_assign:
+		return g_strdup("lazyques");
+		break;
+	case assign:
+		return g_strdup("assign");
+		break;
+	};
 }
 
-void cbb_conf_s_print(struct cbb_conf_s *conf) {
-	if (conf == NULL) {
-		fprintf(stderr, "cbb_conf_s is EMPTY!");
-		return;
-	}
-
-	printf("* cbb_conf_s:\n\tkey: '%s'\n\tval: '%s'\n\tflag: '%s'\n\texport: '%d'\n\tassign_op: '%d'\n",
-	       conf->key,
-	       conf->val,
-	       conf->flag,
-	       conf->export,
-	       conf->op);
+gchar* cbb_types_kw_itoa(enum kw_type kw) {
+	switch (kw) {
+	case include:
+		return g_strdup("include");
+		break;
+	case inherit:
+		return g_strdup("inherit");
+		break;
+	case require:
+		return g_strdup("require");
+		break;
+	case export_funcs:
+		return g_strdup("EXPORT_FUNCTIONS");
+		break;
+	case deltask:
+		return g_strdup("deltask");
+		break;
+	};
 }
 
-void cbb_kw_s_free(struct cbb_kw_s *kw) {
-	if (kw == NULL) {
-		return;
+GHashTable* add_str(GHashTable *table, const gchar *key, const gchar *val) {
+	gboolean r = FALSE;
+
+	r = g_hash_table_insert(table, g_strdup(key), g_strdup(val));
+	if (r != TRUE) {
+		cbb_fail("Failed to add string to hashtable!");
 	}
 
-	if (kw->val != NULL) {
-		g_free(kw->val);
-	}
-
-	kw = NULL;
+	return table;
 }
 
-void cbb_kw_s_print(struct cbb_kw_s *kw) {
-	if (kw == NULL) {
-		fprintf(stderr, "cbb_kw_s is EMPTY!");
-		return;
+GHashTable* add_int(GHashTable *table, const gchar *key, gint val) {
+	gboolean r = FALSE;
+	gint *value = calloc(1, sizeof(gint));
+	*value = val;
+
+	r = g_hash_table_insert(table, g_strdup(key), value);
+	if (r != TRUE) {
+		cbb_fail("Failed to add string to hashtable!");
 	}
 
-	printf("* cbb_kw_s:\n\ttype: '%d'\n\tval: '%s'\n",
-	       kw->type,
-	       kw->val);
+	return table;
 }
 
-void cbb_block_s_free(struct cbb_block_s *block) {
-	if (block == NULL) {
-		return;
+gint types_get_type(GHashTable *entry) {
+	if (entry == NULL) {
+		return -1;
 	}
 
-	if (block->name != NULL) {
-		g_free(block->name);
-	}
-
-	if (block->expr != NULL) {
-		g_free(block->expr);
-	}
-
-	block = NULL;
+	// TODO continue here!
+	g_hash_table_lookup(entry, "type");
 }
 
-void cbb_block_s_print(struct cbb_block_s *block) {
-	if (block == NULL) {
-		fprintf(stderr, "cbb_block_s is EMPTY!");
-		return;
+GHashTable* new(enum parser_type type) {
+	GHashTable *tmp = NULL;
+	gint *lineno = NULL;
+	gint *parser_type = NULL;
+	gboolean r = FALSE;
+
+	tmp = g_hash_table_new_full(g_str_hash,
+	                            g_str_equal,
+	                            g_free,
+	                            g_free);
+
+	r = g_hash_table_insert(tmp, g_strdup("filename"), g_strdup(filename));
+	if (r != TRUE) {
+		cbb_fail("Failed to insert hashtable value!");
 	}
 
-	printf("* cbb_block_s:\n\tname: '%s'\n\texpr: '%s'\n",
-	       block->name,
-	       block->expr);
+	lineno = calloc(1, sizeof(gint));
+	*lineno = row_num;
+
+	r = g_hash_table_insert(tmp, g_strdup("lineno"), lineno);
+	if (r != TRUE) {
+		cbb_fail("Failed to insert hashtable value!");
+	}
+
+	parser_type = calloc(1, sizeof(gint));
+	*parser_type = type;
+
+	r = g_hash_table_insert(tmp, g_strdup("type"), parser_type);
+	if (r != TRUE) {
+		cbb_fail("Failed to insert hashtable value!");
+	}
+
+	return tmp;
 }
 
-void cbb_gen_s_free(struct cbb_gen_s *gen) {
-	if (gen == NULL) {
-		return;
+void conf_set(GHashTable *table,
+              const gchar *key,
+              const gchar *val,
+              const gchar *flag,
+              enum assign_op op) {
+	enum quote_type quote = single_quote;
+	if (val[0] == '"') {
+		quote = double_quote;
 	}
 
-	if (gen->filename != NULL) {
-		g_free(gen->filename);
-	}
-
-	if (gen->data == NULL) {
-		cbb_fail("Trying to free empty data!");
-	}
-	switch (gen->type) {
-		case conf:
-			cbb_conf_s_free(gen->data);
-			break;
-		case kw:
-			cbb_kw_s_free(gen->data);
-			break;
-		case block:
-			cbb_block_s_free(gen->data);
-			break;
-		default:
-			cbb_fail("Invalid type!");
-			break;
-	}
-
-	gen = NULL;
+	add_str(table, "key", key);
+	add_str(table, "val", val);
+	add_str(table, "flag", flag);
+	add_int(table, "quote", quote);
+	add_int(table, "op", op);
 }
 
-void cbb_gen_s_print(struct cbb_gen_s *gen) {
-	if (gen == NULL) {
-		fprintf(stderr, "cbb_gen_s is EMPTY!");
-		return;
+void block_set(GHashTable *table,
+               const gchar *key,
+               const gchar *expr,
+               gint fakeroot,
+               gint python) {
+	if (table == NULL || key == NULL || expr == NULL) {
+		cbb_fail("empty pointer args");
 	}
 
-	printf("**** START GEN ****\n");
-	printf("* cbb_gen_s:\n\tfilename: '%s'\n\tlineno: '%d'\n",
-	       gen->filename,
-	       gen->lineno);
-	if (gen->data == NULL) {
-		cbb_fail("Failed to print empty data!");
-	}
-
-	switch (gen->type) {
-		case conf:
-			cbb_conf_s_print(gen->data);
-			break;
-		case kw:
-			cbb_kw_s_print(gen->data);
-			break;
-		case block:
-			cbb_block_s_print(gen->data);
-			break;
-		default:
-			cbb_fail("Invalid type!");
-			break;
-	}
-	printf("**** END GEN ****\n");
+	add_str(table, "key", key);
+	add_str(table, "expr", expr);
+	add_int(table, "fakeroot", fakeroot);
+	add_int(table, "python", python);
 }

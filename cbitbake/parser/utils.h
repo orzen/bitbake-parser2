@@ -3,11 +3,10 @@
 
 #include <glib.h>
 
-#include "parser_types.h"
-
 #define cbb_fail(format, ...) _cbb_fail("FAILED: %s[%d]: " format "\n", __func__, __LINE__, ##__VA_ARGS__)
 void _cbb_fail(const gchar *format, ...);
 
+#if 0
 void conf_set(GHashTable *table,
               const gchar *key,
               const gchar *val,
@@ -23,5 +22,6 @@ void block_set(GHashTable *table,
 GHashTable* add_str(GHashTable *table, const gchar *key, const gchar *val);
 GHashTable* add_int(GHashTable *table, const gchar *key, gint val);
 GHashTable* new(enum parser_type type);
+#endif
 
 #endif

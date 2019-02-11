@@ -11,15 +11,14 @@ typedef void* yyscan_t;
 typedef union {
 	gint ival;
 	gchar *sval;
-	GHashTable *hashtable;
-	GList *list;
+	GNode *node;
 } YYSTYPE;
 
 int yyget_lineno(yyscan_t yyscanner);
 int yylex(YYSTYPE *yylval, yyscan_t yyscanner);
-void yyerror(yyscan_t yyscanner, GList **acc, const gchar *err);
-int yyparse(yyscan_t yyscanner, GList **acc);
+void yyerror(yyscan_t yyscanner, GNode **acc, const gchar *err);
+int yyparse(yyscan_t yyscanner, GNode **acc);
 
-GList* cbb_parse_file(const gchar *fn);
+GNode* cbb_parse_file(const gchar *fn);
 
 #endif

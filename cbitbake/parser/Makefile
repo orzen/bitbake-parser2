@@ -6,7 +6,7 @@ BISON_GEN = parser.tab.c parser.tab.h
 LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
-SRCS = $(BISON_GEN) $(LEX_GEN) files.c main.c utils.c
+SRCS = $(BISON_GEN) $(LEX_GEN) files.c main.c node.c utils.c
 
 PKGS = glib-2.0
 

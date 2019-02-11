@@ -22,6 +22,7 @@ __classname__
 
 static PyObject *PARSER_ERROR;
 
+#if 0
 static void foo(){
 	PyObject *path = PyImport_ImportModule("os.path");
 	//PyObject *path = PyObject_GetAttrString(os, "path");
@@ -38,8 +39,8 @@ static void foo(){
 	os_res = PyObject_CallMethod(path, "exists", "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
 	//os_res = PyObject_CallFunction(fun_exists, "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
 	printf("cbbparser.cpython-37m-x86_64-linux-gnu.so exists? '%d'\n", os_res == Py_True);
-
 }
+#endif
 
 
 static gint import_modules(GHashTable *modules, gint num, ...) {
@@ -71,7 +72,30 @@ static gint import_modules(GHashTable *modules, gint num, ...) {
 	return r;
 }
 
-static void convert_to_block_stmt() {
+gint handle_resolve_kw_callback(enum kw_type kw_t, void **callback) {
+	gint force = 0;
+}
+
+gint handle_type_kw(GHashTable *entry) {
+	gint *keyword = NULL;
+
+	if (entry == NULL) {
+		g_warning("empty arguments");
+		return -1;
+	}
+
+	keyword = g_hash_table_lookup(entry, "keyword");
+	if (keyword == NULL) {
+		g_warning("failed to resolve keyword");
+		return -1;
+	}
+
+	convert_kw_to_match(*keyword, entry);
+
+
+	ast_handle_
+
+	return 0;
 }
 
 static void get_statements(const gchar *filename,
@@ -83,18 +107,33 @@ static void get_statements(const gchar *filename,
 	parse_result = cbb_parse_file(abs_filename);
 
 	GList *iter;
-	for(iter = foo; g_list_next(iter) != NULL; iter = g_list_next(iter)) {
-		GHashTable *tbl;
+	for(iter = parse_result; g_list_next(iter) != NULL; iter = g_list_next(iter)) {
+		GHashTable *entry;
 		gchar *filename;
 		gint *lineno;
 		gchar *type;
 
-		tbl = iter->data;
-		filename = g_hash_table_lookup(tbl, "filename");
-		lineno = g_hash_table_lookup(tbl, "lineno");
-		type = g_hash_table_lookup(tbl, "type");
+		entry = iter->data;
+		filename = g_hash_table_lookup(entry, "filename");
+		lineno = g_hash_table_lookup(entry, "lineno");
+		type = g_hash_table_lookup(entry, "type");
 
-		printf("filename '%s', type '%s', lineno '%d'\n", fname, type, *lineno);
+		switch(type) {
+		case block:
+			handle_type_block(entry);
+			break;
+		case conf:
+			handle_type_conf(entry);
+			break;
+		case kw:
+			handle_type_kw(entry);
+			break;
+		case addtask:
+			handle_type_addtask(entry);
+			break;
+		}
+
+		printf("filename '%s', type '%s', lineno '%d'\n", filename, type, *lineno);
 	}
 }
 
@@ -102,6 +141,7 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 	GHashTable *modules;
 	gchar *filename = NULL;
 	gchar *basename = NULL;
+	gchar *abs_path = NULL;
 	gchar **split = NULL;
 	PyObject *user_data = NULL;
 	PyObject *d = NULL;
@@ -188,7 +228,8 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 		return NULL;
 	}
 
-	get_statements(filename, abs_fn, basename);
+	abs_path = PyBytes_AsString(abs_fn);
+	get_statements(filename, abs_path, basename);
 
 	//cbb_print_pyobj("abs.txt", abs_fn);
 

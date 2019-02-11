@@ -55,11 +55,19 @@ parser = Extension('cbbparser',
                               'python_bindings.c',
                               'python_utils.c',
                               'pyobj_d.c',
+                              'pyobj_match_mock.c',
                               'utils.c'])
+
+remock = Extension('remock',
+                   include_dirs = ['/usr/include/glib-2.0',
+                       '/usr/lib/x86_64-linux-gnu/glib-2.0/include'],
+                   libraries = ['glib-2.0'],
+                   sources = ['pyobj_match_mock.c',
+                              ])
 
 
 
 setup(name = 'cparser',
       version = version,
       description = 'C implementation of bitbake parser',
-      ext_modules = [parser])
+      ext_modules = [parser, remock])

@@ -4,8 +4,8 @@
 
 #include "args.h"
 #include "files.h"
+#include "node.h"
 #include "parser_types.h"
-#include "utils.h"
 %}
 
 %define api.pure full
@@ -18,23 +18,21 @@
 %verbose
 
 %lex-param {yyscan_t yyscanner}
-%parse-param {yyscan_t yyscanner} {GList **acc}
+%parse-param {yyscan_t yyscanner} {GNode **acc}
 
-%token <ival> SINGLE_QUOTE DOUBLE_QUOTE
-%token <ival> DELTASK EXPORT EXPORT_FUNCTIONS INCLUDE INHERIT REQUIRE
-%token <sval> WORD STRING BLOCK_START BLOCK_CONTENT ADDTASK_CONTENT
+/* Block statements */
+%token FAKEROOT PYTHON EXPORT PREDOT_ASSIGN POSTDOT_ASSIGN
+       PREPEND_ASSIGN APPEND_ASSIGN COLON_ASSIGN QUES_ASSIGN LAZYQUES_ASSIGN
+       ASSIGN ADDTASK ADDTASK_AFTER ADDTASK_BEFORE UNSET STRING_CONTINUATION
+%token <sval> ADDTASK_CONTENT BLOCK_START BLOCK_CONTENT SLI_CONTENT
+              MLI_CONTENT WORD STRING
+%token <ival> SINGLE_QUOTE DOUBLE_QUOTE INHERIT INCLUDE REQUIRE DELTASK
+              EXPORT_FUNCTIONS
 
-%token ADDTASK ADDTASK_AFTER ADDTASK_BEFORE ADDTASK_END
-%token FAKEROOT PYTHON
-%token PREDOT_ASSIGN POSTDOT_ASSIGN PREPEND_ASSIGN APPEND_ASSIGN
-       COLON_ASSIGN QUES_ASSIGN LAZYQUES_ASSIGN ASSIGN
-%token EOL STRING_CONTINUATION BLOCK_END
-
-%type <ival> assign_op
-%type <sval> block_expr kw_expr
-%type <list> recipe statements
-%type <hashtable> addtask_stmt addtask_expr block_stmt conf_stmt export_stmt statement
-                  kw_keyword kw_stmt
+%type <ival> sli_id mli_id
+%type <sval> block_expr
+%type <node> addtask_stmt addtask_expr block_stmt conf_stmt export_stmt
+             assign_op sli_stmt mli_stmt recipe statements statement
 
 %start recipe
 
@@ -46,106 +44,119 @@
 %%
 
 recipe:
-	statements { *acc = g_list_copy($1); $$ = $1;
-	printf("\nLENGTH '%d'\n", g_list_length($1));
-	}
+	statements { *acc = $1; }
 	;
 
 statements:
-	statement EOL { $$ = g_list_append(NULL, $1); }
-	| statement EOL statements { $$ = g_list_append($3, $1); }
+	statement { $$ = new_str(root, "root"); }
+	| statement statements { $$ = append_node($2, $1); }
 	;
 
 statement:
-	/* Single line */
 	block_stmt { $$ = $1; }
-	| conf_stmt { $$ = $1; }
-	| kw_stmt { $$ = $1; }
+	| sli_stmt { $$ = $1; }
+	| mli_stmt { $$ = $1; }
 	| addtask_stmt { $$ = $1; }
 	| export_stmt { $$ = $1; }
-	;
-
-export_stmt:
-	EXPORT conf_stmt {
-		$$ = add_int($2, "export", 1); }
-	| EXPORT kw_expr {
-		$$ = new(kw);
-		add_int($$, "keyword", $1);
-		add_str($$, "expr", $2);
-		add_int($$, "export", 1); }
+	| conf_stmt { $$ = $1; }
 	;
 
 block_stmt:
-	BLOCK_START block_expr BLOCK_END {
-		$$ = new(block);
-		block_set($$, $1, $2, 0, 0); }
-	| FAKEROOT BLOCK_START block_expr BLOCK_END {
-		$$ = new(block);
-		block_set($$, $2, $3, 1, 0); }
-	| PYTHON BLOCK_START block_expr BLOCK_END {
-		$$ = new(block);
-		block_set($$, $2, $3, 0, 1); }
-	| FAKEROOT PYTHON BLOCK_START block_expr BLOCK_END {
-		$$ = new(block);
-		block_set($$, $3, $4, 1, 1); }
+	BLOCK_START block_expr {
+		$$ = new_str(func, $1);
+		$$ = append_str($$, body, $2); }
+	| FAKEROOT BLOCK_START block_expr {
+		$$ = new_str(func, $2);
+		$$ = append_int($$, fakeroot, 1);
+		$$ = append_str($$, body, $3); }
+	| PYTHON BLOCK_START block_expr {
+		$$ = new_str(func, $2);
+		$$ = append_int($$, python, 1);
+		$$ = append_str($$, body, $3); }
+	| FAKEROOT PYTHON BLOCK_START block_expr {
+		$$ = new_str(func, $3);
+		$$ = append_int($$, fakeroot, 1);
+		$$ = append_int($$, python, 1);
+		$$ = append_str($$, body, $4); }
 	;
 
 block_expr:
 	BLOCK_CONTENT { $$ = $1; }
 	| BLOCK_CONTENT block_expr {
 		$$ = g_strdup_printf("%s%s", $1, $2);
-		g_free($1); g_free($2);}
+		g_free($1); g_free($2); }
 	;
 
 conf_stmt:
 	WORD assign_op STRING {
-		$$ = new(conf);
-		conf_set($$, $1, $3, NULL, $2); }
+		$$ = append_str($2, var, $1);
+		$$ = append_str($$, body, $3); }
 	| WORD '[' WORD ']' assign_op STRING {
-		$$ = new(conf);
-		conf_set($$, $1, $6, $3, $5); }
+		$$ = append_str($5, var, $1);
+		$$ = append_str($$, body, $6);
+		$$ = append_str($$, flag, $3); }
 	;
 
 assign_op:
-	PREDOT_ASSIGN { $$ = predot_assign; }
-	| POSTDOT_ASSIGN { $$ = postdot_assign; }
-	| PREPEND_ASSIGN { $$ = prepend_assign; }
-	| APPEND_ASSIGN { $$ = append_assign; }
-	| COLON_ASSIGN { $$ = colon_assign; }
-	| QUES_ASSIGN { $$ = ques_assign; }
-	| LAZYQUES_ASSIGN { $$ = lazyques_assign; }
-	| ASSIGN { $$ = assign; }
+	PREDOT_ASSIGN { $$ = new_int(op, predot_assign); }
+	| POSTDOT_ASSIGN { $$ = new_int(op, postdot_assign); }
+	| PREPEND_ASSIGN { $$ = new_int(op, prepend_assign); }
+	| APPEND_ASSIGN { $$ = new_int(op, append_assign); }
+	| COLON_ASSIGN { $$ = new_int(op, colon_assign); }
+	| QUES_ASSIGN { $$ = new_int(op, ques_assign); }
+	| LAZYQUES_ASSIGN { $$ = new_int(op, lazyques_assign); }
+	| ASSIGN { $$ = new_int(op, assign); }
 	;
 
-kw_stmt:
-	kw_keyword kw_expr {
-		$$ = add_str($1, "expr", $2);
-		add_int($$, "export", 0); }
+export_stmt:
+	EXPORT conf_stmt {
+		$$ = append_int($2, exported, 1); }
 	;
 
-kw_keyword:
-	DELTASK { $$ = new(kw); add_int($$, "keyword", $1); }
-	| EXPORT_FUNCTIONS { $$ = new(kw); add_int($$, "keyword", $1); }
-	| INCLUDE { $$ = new(kw); add_int($$, "keyword", $1); }
-	| INHERIT { $$ = new(kw); add_int($$, "keyword", $1); }
-	| REQUIRE { $$ = new(kw); add_int($$, "keyword", $1); }
+sli_stmt:
+	sli_id SLI_CONTENT {
+		$$ = new_str($1, $2); }
 	;
 
-kw_expr:
-	WORD { $$ = $1; }
-	| WORD kw_expr { $$ = g_strdup_printf("%s %s", $1, $2); }
-	| WORD STRING_CONTINUATION kw_expr {
-		$$ = g_strdup_printf("%s %s", $1, $3); }
+sli_id:
+	UNSET { $$ = unset; }
+	;
+
+mli_stmt:
+	mli_id MLI_CONTENT {
+		$$ = new_str($1, $2); }
+	;
+
+mli_id:
+	INHERIT { $$ = $1; }
+	| INCLUDE { $$ = $1; }
+	| REQUIRE { $$ = $1; }
+	| DELTASK { $$ = $1; }
+	| EXPORT_FUNCTIONS { $$ = $1; }
 	;
 
 addtask_stmt:
-	ADDTASK addtask_expr ADDTASK_END { $$ = $2; }
+	ADDTASK addtask_expr { $$ = $2; }
 	;
 
 addtask_expr:
-	ADDTASK_CONTENT { $$ = new(addtask); add_str($$, "content", $1); }
-	| addtask_expr ADDTASK_AFTER ADDTASK_CONTENT { add_str($1, "after", $3); }
-	| addtask_expr ADDTASK_BEFORE ADDTASK_CONTENT { add_str($1, "before", $3); }
+	ADDTASK_CONTENT { $$ = new_str(addtask, $1); }
+	| addtask_expr ADDTASK_AFTER ADDTASK_CONTENT { $$ = append_str($1, after, $3); }
+	| addtask_expr ADDTASK_BEFORE ADDTASK_CONTENT { $$ = append_str($1, before, $3); }
 	;
 
 %%
+
+#if 0
+sli_expr:
+	WORD { $$ = $1; }
+	| WORD sli_expr { $$ = g_strdup_printf("%s %s", $1, $2); }
+	;
+
+mli_expr:
+	WORD { $$ = $1; }
+	| WORD mli_expr { $$ = g_strdup_printf("%s %s", $1, $2); }
+	| WORD STRING_CONTINUATION mli_expr {
+		$$ = g_strdup_printf("%s %s", $1, $3); }
+	;
+#endif

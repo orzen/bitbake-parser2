@@ -1,13 +1,6 @@
 #ifndef _PARSER_TYPES_H_
 #define _PARSER_TYPES_H_
 
-enum parser_type {
-	block = 0,
-	conf,
-	kw,
-	addtask,
-};
-
 enum assign_op {
 	predot_assign = 0,
 	postdot_assign,
@@ -24,58 +17,27 @@ enum quote_type {
 	double_quote
 };
 
-enum kw_type {
-	deltask = 0,
-	export_var,
-	export_fun,
-	include,
-	inherit,
-	require
-};
-
 #if 0
-struct cbb_conf_s {
-	gchar *key;
-	gchar *val;
-	gchar *flag;
-	gboolean export;
-	enum assign_op op;
-	enum quote_type quote;
+enum sli_type {
+	export = 0,
+	unset,
 };
 
-struct cbb_kw_s {
-	enum kw_type type;
-	gchar *val;
+enum mli_type {
+	inherit,
+	include,
+	require,
+	deltask,
+	export_funcs
 };
 
-struct cbb_block_s {
-	gchar *name;
-	gchar *expr;
-	gboolean python;
+enum parser_type {
+	block = 0,
+	conf,
+	sli,
+	mli,
+	addtask,
 };
-
-struct cbb_gen_s {
-	gchar *filename;
-	gint lineno;
-	enum parser_type type;
-	void *data;
-};
-
-struct cbb_conf_s* cbb_conf_s_new();
-void cbb_conf_s_free(struct cbb_conf_s *conf);
-void cbb_conf_s_print(struct cbb_conf_s *conf);
-
-struct cbb_kw_s* cbb_kw_s_new();
-void cbb_kw_s_free(struct cbb_kw_s *list);
-void cbb_kw_s_print(struct cbb_kw_s *list);
-
-struct cbb_block_s* cbb_block_s_new();
-void cbb_block_s_free(struct cbb_block_s *block);
-void cbb_block_s_print(struct cbb_block_s *block);
-
-struct cbb_gen_s* cbb_gen_s_new();
-void cbb_gen_s_free(struct cbb_gen_s *gen);
-void cbb_gen_s_print(struct cbb_gen_s *gen);
 #endif
 
 #endif
