@@ -1,12 +1,8 @@
+#include <stdio.h>
 #include <glib.h>
 
 #include "node.h"
-
-struct node_int {
-	enum node_type type;
-	gint lineno;
-	void *data;
-};
+#include "parser_types.h"
 
 extern gint row_num;
 
@@ -139,7 +135,30 @@ GNode *append_node(GNode *parent, GNode *child) {
 		return NULL;
 	}
 
-	g_node_append(parent, child);
+	g_node_prepend(parent, child);
 
 	return parent;
+}
+
+gboolean node_debug_traverse_func(GNode *node, gpointer data) {
+	gint depth = g_node_depth(node) * 2;
+	gint i = 0;
+	struct node_int *internal = node->data;
+
+	printf("|");
+	for (i = 0; i < depth; i++) {
+		printf("_");
+	}
+	printf("%s:%d\n", types_itoa(internal->type), internal->lineno);
+
+	return FALSE;
+}
+
+void node_print_tree(GNode *root) {
+	if (root == NULL) {
+		g_warning("root node is NULL");
+		return;
+	}
+
+	g_node_traverse(root, G_PRE_ORDER, G_TRAVERSE_ALL, -1, node_debug_traverse_func, NULL);
 }

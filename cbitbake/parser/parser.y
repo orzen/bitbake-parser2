@@ -6,6 +6,8 @@
 #include "files.h"
 #include "node.h"
 #include "parser_types.h"
+
+extern gint row_num;
 %}
 
 %define api.pure full
@@ -23,16 +25,16 @@
 /* Block statements */
 %token FAKEROOT PYTHON EXPORT PREDOT_ASSIGN POSTDOT_ASSIGN
        PREPEND_ASSIGN APPEND_ASSIGN COLON_ASSIGN QUES_ASSIGN LAZYQUES_ASSIGN
-       ASSIGN ADDTASK ADDTASK_AFTER ADDTASK_BEFORE UNSET STRING_CONTINUATION
+       ASSIGN ADDTASK ADDTASK_AFTER ADDTASK_BEFORE UNSET
 %token <sval> ADDTASK_CONTENT BLOCK_START BLOCK_CONTENT SLI_CONTENT
-              MLI_CONTENT WORD STRING
+              MLI_CONTENT WORD STRING STRING_CONTINUATION
 %token <ival> SINGLE_QUOTE DOUBLE_QUOTE INHERIT INCLUDE REQUIRE DELTASK
               EXPORT_FUNCTIONS
 
-%type <ival> sli_id mli_id
-%type <sval> block_expr
+%type <ival> sli_id
+%type <sval> block_expr mli_expr
 %type <node> addtask_stmt addtask_expr block_stmt conf_stmt export_stmt
-             assign_op sli_stmt mli_stmt recipe statements statement
+             assign_op sli_stmt mli_id mli_stmt recipe statements statement
 
 %start recipe
 
@@ -48,7 +50,8 @@ recipe:
 	;
 
 statements:
-	statement { $$ = new_str(root, "root"); }
+	statement { $$ = new_str(root, "root");
+	            $$ = append_node($$, $1); }
 	| statement statements { $$ = append_node($2, $1); }
 	;
 
@@ -98,24 +101,25 @@ conf_stmt:
 	;
 
 assign_op:
-	PREDOT_ASSIGN { $$ = new_int(op, predot_assign); }
-	| POSTDOT_ASSIGN { $$ = new_int(op, postdot_assign); }
-	| PREPEND_ASSIGN { $$ = new_int(op, prepend_assign); }
-	| APPEND_ASSIGN { $$ = new_int(op, append_assign); }
-	| COLON_ASSIGN { $$ = new_int(op, colon_assign); }
-	| QUES_ASSIGN { $$ = new_int(op, ques_assign); }
-	| LAZYQUES_ASSIGN { $$ = new_int(op, lazyques_assign); }
-	| ASSIGN { $$ = new_int(op, assign); }
+	PREDOT_ASSIGN { $$ = new_int(conf, predot_assign); }
+	| POSTDOT_ASSIGN { $$ = new_int(conf, postdot_assign); }
+	| PREPEND_ASSIGN { $$ = new_int(conf, prepend_assign); }
+	| APPEND_ASSIGN { $$ = new_int(conf, append_assign); }
+	| COLON_ASSIGN { $$ = new_int(conf, colon_assign); }
+	| QUES_ASSIGN { $$ = new_int(conf, ques_assign); }
+	| LAZYQUES_ASSIGN { $$ = new_int(conf, lazyques_assign); }
+	| ASSIGN { $$ = new_int(conf, assign); }
 	;
 
 export_stmt:
-	EXPORT conf_stmt {
-		$$ = append_int($2, exported, 1); }
+	EXPORT conf_stmt { $$ = append_int($2, exported, 1); }
 	;
 
 sli_stmt:
-	sli_id SLI_CONTENT {
-		$$ = new_str($1, $2); }
+	sli_id SLI_CONTENT { $$ = new_str($1, $2); }
+	| sli_id SLI_CONTENT '[' SLI_CONTENT ']' {
+		$$ = new_str($1, $2);
+		$$ = append_str($$, flag, $4); }
 	;
 
 sli_id:
@@ -123,17 +127,23 @@ sli_id:
 	;
 
 mli_stmt:
-	mli_id MLI_CONTENT {
-		$$ = new_str($1, $2); }
+	mli_id mli_expr {
+		$$ = append_str($1, body, $2); }
 	;
 
 mli_id:
-	INHERIT { $$ = $1; }
-	| INCLUDE { $$ = $1; }
-	| REQUIRE { $$ = $1; }
-	| DELTASK { $$ = $1; }
-	| EXPORT_FUNCTIONS { $$ = $1; }
+	INHERIT { $$ = new_str($1, "inherit"); }
+	| INCLUDE { $$ = new_str($1, "include"); }
+	| REQUIRE { $$ = new_str($1, "require"); }
+	| DELTASK { $$ = new_str($1, "deltask"); }
+	| EXPORT_FUNCTIONS { $$ = new_str($1, "export_funcs"); }
 	;
+
+mli_expr:
+	MLI_CONTENT { $$ = $1;}
+	| MLI_CONTENT STRING_CONTINUATION mli_expr {
+		$$ = g_strdup_printf("%s%s%s", $3, $2, $1);
+		g_free($1); g_free($2); g_free($3);}
 
 addtask_stmt:
 	ADDTASK addtask_expr { $$ = $2; }

@@ -6,9 +6,11 @@ BISON_GEN = parser.tab.c parser.tab.h
 LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
-SRCS = $(BISON_GEN) $(LEX_GEN) files.c main.c node.c utils.c
+SRCS = $(BISON_GEN) $(LEX_GEN) \
+       convert.c pyobj_ast.c \
+       files.c main.c node.c parser_types.c utils.c
 
-PKGS = glib-2.0
+PKGS = glib-2.0 python-3.7
 
 CFLAGS += -ggdb -O0 -Wall
 CFLAGS += $(shell pkg-config --cflags $(PKGS))

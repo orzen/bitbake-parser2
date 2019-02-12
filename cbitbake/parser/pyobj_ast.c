@@ -1,6 +1,7 @@
 #include <glib.h>
 #include <Python.h>
 
+#if 0
 void ast_handle_entry(PyObject *ast, GHashTable *entry) {
 	gchar *filename = NULL;
 	gint *lineno = NULL;
@@ -45,31 +46,81 @@ void ast_handle_entry(PyObject *ast, GHashTable *entry) {
 	};
 }
 
+#endif
+
+void ast_handle_method(PyObject *ast) {
+	//handleMethod(statements, filename, lineno, func_name, body, python, fakeroot):
+	//    statements.append(MethodNode(filename, lineno, func_name, body, python, fakeroot))
+	return;
+}
+
 void ast_handle_python_method(PyObject *ast) {
+//handlePythonMethod(statements, filename, lineno, funcname, modulename, body):
+//    statements.append(PythonMethodNode(filename, lineno, funcname, modulename, body))
+	return;
 }
 
-void ast_export(PyObject *ast) {
-	ast.handleExportFuncs(statements, fn, lineno, m, __classname__)
+void ast_handle_export_funcs(PyObject *ast) {
+//handleExportFuncs(statements, filename, lineno, m, classname):
+//    statements.append(ExportFuncsNode(filename, lineno, m.group(1), classname))
+	//ast.handleExportFuncs(statements, fn, lineno, m, __classname__)
+	return;
 }
 
-void ast_add_task(PyObject *ast) {
-	ast.handleAddTask(statements, fn, lineno, m)
+void ast_handle_addtask(PyObject *ast) {
+//handleAddTask(statements, filename, lineno, m):
+//    func = m.group("func")
+//    before = m.group("before")
+//    after = m.group("after")
+//    if func is None:
+//        return
+//
+//    statements.append(AddTaskNode(filename, lineno, func, before, after))
+	//ast.handleAddTask(statements, fn, lineno, m)
+	return;
 }
 
-void ast_del_task(PyObject *ast) {
-	ast.handleDelTask(statements, fn, lineno, m)
+void ast_handle_deltask(PyObject *ast) {
+//handleDelTask(statements, filename, lineno, m):
+//    func = m.group("func")
+//    if func is None:
+//        return
+//
+//    statements.append(DelTaskNode(filename, lineno, func))
+	//ast.handleDelTask(statements, fn, lineno, m)
+	return;
 }
 
-void ast_add_handler(PyObject *ast) {
-	ast.handleBBHandlers(statements, fn, lineno, m)
+void ast_handle_add_handler(PyObject *ast) {
+//handleBBHandlers(statements, filename, lineno, m):
+//    statements.append(BBHandlerNode(filename, lineno, m.group(1)))
+	//ast.handleBBHandlers(statements, fn, lineno, m)
+	return;
 }
 
-void ast_inherit(PyObject *ast) {
-	ast.handleInherit(statements, fn, lineno, m)
+void ast_handle_inherit(PyObject *ast) {
+	//ast.handleInherit(statements, fn, lineno, m)
+	//handleInherit(statements, filename, lineno, m):
+	//    classes = m.group(1)
+	//    statements.append(InheritNode(filename, lineno, classes))
+	return;
 }
 
 void ast_handle_data(PyObject *ast) {
-	ast.handleData(statements, fn, lineno, groupd)
+	//ast.handleData(statements, fn, lineno, groupd)
+	return;
+}
+
+void ast_handle_unset(PyObject *ast) {
+	//handleUnset(statements, filename, lineno, m):
+	//    statements.append(UnsetNode(filename, lineno, m.group(1)))
+	return;
+}
+
+void ast_handle_unset_flag(PyObject *ast) {
+//handleUnsetFlag(statements, filename, lineno, m):
+//    statements.append(UnsetFlagNode(filename, lineno, m.group(1), m.group(2)))
+	return;
 }
 
 void ast_handle_include(PyObject *ast,
@@ -78,16 +129,14 @@ void ast_handle_include(PyObject *ast,
                         const PyObject *lineno,
                         const PyObject *match,
                         const PyObject *force) {
-	PyObject *args = Py_BuildValue("OOOOO", statements, filename, lineno,
-	                               match, force);
-	ast.handleInclude(statements, fn, lineno, m, False)
+	//PyObject *args = Py_BuildValue("OOOOO", statements, filename, lineno,
+	//                               match, force);
+	//ast.handleInclude(statements, fn, lineno, m, False)
 
+	return;
 }
 
 #if 0
-handleInherit(statements, filename, lineno, m):
-    classes = m.group(1)
-    statements.append(InheritNode(filename, lineno, classes))
 
 handleInclude(statements, filename, lineno, m, force):
     statements.append(IncludeNode(filename, lineno, m.group(1), force))
@@ -96,40 +145,14 @@ handleInclude(statements, filename, lineno, m, force):
 handleExport(statements, filename, lineno, m):
     statements.append(ExportNode(filename, lineno, m.group(1)))
 
-handleUnset(statements, filename, lineno, m):
-    statements.append(UnsetNode(filename, lineno, m.group(1)))
 
-handleUnsetFlag(statements, filename, lineno, m):
-    statements.append(UnsetFlagNode(filename, lineno, m.group(1), m.group(2)))
 
 handleData(statements, filename, lineno, groupd):
     statements.append(DataNode(filename, lineno, groupd))
 
-handleMethod(statements, filename, lineno, func_name, body, python, fakeroot):
-    statements.append(MethodNode(filename, lineno, func_name, body, python, fakeroot))
 
-handlePythonMethod(statements, filename, lineno, funcname, modulename, body):
-    statements.append(PythonMethodNode(filename, lineno, funcname, modulename, body))
 
-handleExportFuncs(statements, filename, lineno, m, classname):
-    statements.append(ExportFuncsNode(filename, lineno, m.group(1), classname))
 
-handleAddTask(statements, filename, lineno, m):
-    func = m.group("func")
-    before = m.group("before")
-    after = m.group("after")
-    if func is None:
-        return
 
-    statements.append(AddTaskNode(filename, lineno, func, before, after))
 
-handleDelTask(statements, filename, lineno, m):
-    func = m.group("func")
-    if func is None:
-        return
-
-    statements.append(DelTaskNode(filename, lineno, func))
-
-handleBBHandlers(statements, filename, lineno, m):
-    statements.append(BBHandlerNode(filename, lineno, m.group(1)))
 #endif

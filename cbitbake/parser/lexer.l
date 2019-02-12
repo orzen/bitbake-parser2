@@ -6,7 +6,7 @@
 
 #include "files.h"
 #include "lexer.h"
-#include "node.h"
+#include "parser_types.h"
 #include "parser.tab.h"
 #include "utils.h"
 
@@ -16,6 +16,8 @@ gchar *filename;
 
 void count(yyscan_t scanner);
 gchar* duptext(yyscan_t scanner);
+
+// TODO Handle 'def foo(a, b):'-style functions
 
 %}
 %option noyywrap bison-bridge reentrant stack debug
@@ -65,7 +67,8 @@ WORD [a-zA-Z0-9_\.'\$\{\}-]
 
 <SLI>\n             { count(yyscanner);
                       yy_pop_state(yyscanner); }
-<SLI>[[:space:]]+   { count(yyscanner); }
+<SLI>"["|"]"        { count(yyscanner);
+                      return yytext[0]; }
 <SLI>[[:print:]]+   { count(yyscanner);
                       yylval->sval = duptext(yyscanner);
                       return SLI_CONTENT; }
@@ -79,9 +82,8 @@ WORD [a-zA-Z0-9_\.'\$\{\}-]
 <MLI>"\\\n"+        { count(yyscanner);
                       yylval->sval = duptext(yyscanner);
                       return STRING_CONTINUATION; }
-<MLI>\n\n           { count(yyscanner);
+<MLI>\n+            { count(yyscanner);
                       yy_pop_state(yyscanner); }
-<MLI>[[:space:]]+   { count(yyscanner); }
 "inherit"           { count(yyscanner);
                       yylval->ival = inherit;
                       yy_push_state(MLI, yyscanner);
@@ -112,7 +114,9 @@ WORD [a-zA-Z0-9_\.'\$\{\}-]
 "?="                { count(yyscanner); return QUES_ASSIGN; }
 "??="               { count(yyscanner); return LAZYQUES_ASSIGN; }
 
-"\\\n"+             { count(yyscanner); return STRING_CONTINUATION; }
+"\\\n"+             { count(yyscanner);
+                      yylval->sval = duptext(yyscanner);
+                      return STRING_CONTINUATION; }
 "\n"+               { count(yyscanner); }
 
 [\[\]\(\)\{\}]      { count(yyscanner); return yytext[0]; }
@@ -124,6 +128,8 @@ WORD [a-zA-Z0-9_\.'\$\{\}-]
 
 .                   { fprintf(stderr, "\nUnrecognized character '%s', '%d: %d'\n", yytext, row_num, col_num); exit(-1); }
 %%
+
+//"["|"]"|"("|")"|"{"|"}"      { count(yyscanner); return yytext[0]; }
 
 gchar* duptext(yyscan_t scanner) {
 	gchar *tmp = NULL;
@@ -170,7 +176,7 @@ void count(yyscan_t scanner) {
 		size = fprintf(out, "%s", text);
 		if (size != len) {
 			printf("\nsize '%zu', len '%d'\n", size, len);
-			cbb_fail("Failed to put back buffer content");
+			cbb_fail("Failed to put restore buffer\n content:'%s'\n size: '%zu', len: '%d'\n row: '%d', col: '%d'", text, size, len, row_num, col_num);
 		}
 	}
 }

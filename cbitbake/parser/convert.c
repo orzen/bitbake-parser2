@@ -1,8 +1,172 @@
 #include <glib.h>
 #include <Python.h>
+#include <stdarg.h>
 
+#include "log.h"
+#include "node.h"
 #include "parser_types.h"
 
+struct traverse_data {
+	GList *parents;
+	PyObject *list;
+	PyObject *tuple;
+};
+
+static gint convert_traverse_to_pydict(GNode *node, PyObject **dict) {
+	GNode *child = NULL;
+	struct node_int *internal = NULL;
+
+	if (node == NULL) {
+		log_warn("failed to traverse children, empty node");
+		return -1;
+	}
+
+	for (child = node->children;
+	     child != NULL;
+	     child = g_node_next_sibling(child)) {
+		internal = child->data;
+		g_warning("type: '%s', lineno: '%d'",
+		          types_itoa(internal->type), internal->lineno);
+	}
+
+	return 0;
+}
+
+static gint convert_traverse_to_pylist(GNode *node, PyObject **list) {
+	GNode *child = NULL;
+	struct node_int *internal = NULL;
+
+	if (node == NULL) {
+		log_warn("failed to traverse children, empty node");
+		return -1;
+	}
+
+	for (child = node->children;
+	     child != NULL;
+	     child = g_node_next_sibling(child)) {
+		internal = child->data;
+		g_warning("type: '%s', lineno: '%d'",
+		          types_itoa(internal->type), internal->lineno);
+	}
+
+	return 0;
+}
+
+static gint convert_traverse_func(GNode *root,
+                                  gpointer user_data) {
+	GNode *child = NULL;
+	struct node_int *internal = NULL;
+
+	if (root == NULL) {
+		log_warn("empty args");
+		return -1;
+	}
+
+	for (child = root->children;
+	     child != NULL;
+	     child = g_node_next_sibling(child)) {
+		internal = child->data;
+		gint type = internal->type;
+		PyObject *args = NULL;
+		void *ast_callback;
+
+		args = PyDict_new();
+		if (args == NULL) {
+			log_warn("failed to create PyDict");
+			return -1;
+		}
+
+		g_warning("type: '%s', lineno: '%d'",
+		          types_itoa(internal->type), internal->lineno);
+
+		if (internal->type == conf) {
+			gint *assign = NULL;
+			assign = internal->data;
+			g_warning("conf: '%s'", cbb_types_assign_op_itoa(*assign));
+			convert_traverse_to_pydict(child, );
+		} else {
+			g_warning("%s: '%s'", types_itoa(type),
+			          (gchar *) internal->data);
+			convert_traverse_to_pylist(child, );
+		}
+
+		//TODO create match-object
+
+		ast_callback = types_get_ast_callback(internal->type);
+	}
+
+	return 0;
+}
+
+PyObject* convert_ast_to_python(GNode *root) {
+	struct traverse_data *u_data = NULL;
+
+	if (root == NULL) {
+		g_warning("unspecified root node");
+		return NULL;
+	}
+
+	u_data = calloc(1, sizeof(struct traverse_data));
+
+	convert_traverse_func(root, u_data);
+
+	return NULL;
+}
+
+PyObject* convert_seq_to_pylist(gchar *fmt, ...) {
+	va_list ap;
+	gint d;
+	gint r;
+	gchar *s;
+	PyObject *list;
+	PyObject *arg = NULL;
+
+	if (fmt == NULL) {
+		return NULL;
+	}
+
+	list = PyList_New(0);
+	if (list == NULL) {
+		return NULL;
+	}
+
+	va_start(ap, fmt);
+	while (*fmt) {
+		switch (*fmt++) {
+		case 's':
+			s = va_arg(ap, gchar *);
+			arg = PyUnicode_FromString(s);
+
+			r = PyList_Append(list, arg);
+			Py_DECREF(arg);
+			arg = NULL;
+			if (r != 0) {
+				g_warning("failed to append value '%s' to list", s);
+				Py_DECREF(list);
+				return NULL;
+			}
+			break;
+		case 'd':
+			d = va_arg(ap, gint);
+			arg = PyLong_FromLong(d);
+
+			r = PyList_Append(list, arg);
+			Py_DECREF(arg);
+			arg = NULL;
+			if (r != 0) {
+				g_warning("failed to append value '%d' to list", d);
+				Py_DECREF(list);
+				return NULL;
+			}
+			break;
+		}
+	}
+	va_end(ap);
+
+	return list;
+}
+
+#if 0
 #define GEN_CONVERT_KW(TYPE) \
 gint _convert_kw_##TYPE##(GHashTable *entry) { \
 	void *callback = &ast_handle_##TYPE; \
@@ -142,58 +306,6 @@ static _include_to_match() {
 	PyObject *match_obj = NULL;
 
 	match_obj = Match_new_int();
-}
-
-static PyObject* convert_va_args_to_pylist(gchar *fmt, ...) {
-	va_list ap;
-	gint d;
-	gchar *s;
-	PyObject *list;
-	PyObject *arg = NULL;
-
-	if (fmt == NULL) {
-		return NULL;
-	}
-
-	list = PyList_New(0);
-	if (list == NULL) {
-		return NULL;
-	}
-
-	va_start(ap, fmt);
-	while (*fmt) {
-		switch (*fmt++) {
-		case 's':
-			s = va_arg(ap, gchar *);
-			arg = PyUnicode_FromString(s);
-
-			r = PyList_Append(list, arg);
-			Py_DECREF(arg);
-			arg = NULL;
-			if (r != 0) {
-				g_warning("failed to append value '%s' to list", s);
-				Py_DECREF(list);
-				return NULL;
-			}
-			break;
-		case 'd':
-			d = va_arg(ap, gint);
-			arg = PyLong_FromLong(d);
-
-			r = PyList_Append(list, arg);
-			Py_DECREF(arg);
-			arg = NULL;
-			if (r != 0) {
-				g_warning("failed to append value '%d' to list", d);
-				Py_DECREF(list);
-				return NULL;
-			}
-			break;
-		}
-	}
-	va_end;
-
-	return list;
 }
 
 static PyObject* convert_kw_to_match_list(enum kw_type kw_t, GHashTable *tbl) {
@@ -360,3 +472,4 @@ gint propagate_arbitrary(PyObject *ast, GHashTable *tbl) {
 
 	return r;
 }
+#endif
