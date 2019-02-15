@@ -60,6 +60,12 @@ void ast_handle_python_method(PyObject *ast) {
 	return;
 }
 
+void ast_handle_export(PyObject *ast, PyObject *args) {
+// same as exporting a variable assignment
+//handleExport(statements, filename, lineno, m):
+//    statements.append(ExportNode(filename, lineno, m.group(1)))
+}
+
 void ast_handle_export_funcs(PyObject *ast) {
 //handleExportFuncs(statements, filename, lineno, m, classname):
 //    statements.append(ExportFuncsNode(filename, lineno, m.group(1), classname))
@@ -91,7 +97,7 @@ void ast_handle_deltask(PyObject *ast) {
 	return;
 }
 
-void ast_handle_add_handler(PyObject *ast) {
+void ast_handle_addhandler(PyObject *ast) {
 //handleBBHandlers(statements, filename, lineno, m):
 //    statements.append(BBHandlerNode(filename, lineno, m.group(1)))
 	//ast.handleBBHandlers(statements, fn, lineno, m)
@@ -106,7 +112,9 @@ void ast_handle_inherit(PyObject *ast) {
 	return;
 }
 
-void ast_handle_data(PyObject *ast) {
+void ast_handle_data(PyObject *ast, PyObject *args) {
+//handleData(statements, filename, lineno, groupd):
+//    statements.append(DataNode(filename, lineno, groupd))
 	//ast.handleData(statements, fn, lineno, groupd)
 	return;
 }
@@ -129,6 +137,9 @@ void ast_handle_include(PyObject *ast,
                         const PyObject *lineno,
                         const PyObject *match,
                         const PyObject *force) {
+
+//handleInclude(statements, filename, lineno, m, force):
+//    statements.append(IncludeNode(filename, lineno, m.group(1), force))
 	//PyObject *args = Py_BuildValue("OOOOO", statements, filename, lineno,
 	//                               match, force);
 	//ast.handleInclude(statements, fn, lineno, m, False)
@@ -136,23 +147,3 @@ void ast_handle_include(PyObject *ast,
 	return;
 }
 
-#if 0
-
-handleInclude(statements, filename, lineno, m, force):
-    statements.append(IncludeNode(filename, lineno, m.group(1), force))
-
-// same as exporting a variable assignment
-handleExport(statements, filename, lineno, m):
-    statements.append(ExportNode(filename, lineno, m.group(1)))
-
-
-
-handleData(statements, filename, lineno, groupd):
-    statements.append(DataNode(filename, lineno, groupd))
-
-
-
-
-
-
-#endif

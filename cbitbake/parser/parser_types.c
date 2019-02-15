@@ -5,83 +5,60 @@
 #include "parser_types.h"
 #include "pyobj_ast.h"
 
-#if 0
-#define TYPE_NEW(TYPE) \
-struct cbb_##TYPE##_s* cbb_##TYPE##_s_new() {\
-	return calloc(1, sizeof(struct cbb_##TYPE##_s));\
-}
-
-TYPE_NEW(conf)
-TYPE_NEW(kw)
-TYPE_NEW(block)
-TYPE_NEW(gen)
-#undef TYPE_NEW
-#endif
-
 struct type_info {
 	const gchar *name;
-	void *ast_callback;
+	AstHandleFunc ast_callback;
+	gint ast_num_args;
 };
 
 static struct type_info type_table[] = {
-	{"root", NULL},
-	{"conf", &ast_handle_data},
-	{"func", &ast_handle_method},
-	{"inherit", &ast_handle_inherit},
-	{"include", &ast_handle_include},
-	{"require", &ast_handle_include},
-	{"addtask", &ast_handle_addtask},
-	{"deltask", &ast_handle_deltask},
-	{"addhandler", &ast_handle_addhandler},
-	{"export_funcs", &ast_handle_export_funcs},
-	{"unset", &ast_handle_unset},
-	{"body", NULL},
-	{"var", NULL},
-	{"flag", NULL},
-	{"exported", &ast_handle_export},
-	{"python", NULL, NULL, &ast_handle_python_method},
-	{"fakeroot", NULL},
-	{"after", NULL},
-	{"before", NULL},
-	{NULL, NULL, NULL, NULL} /* sentinel */
+	{"root", NULL, 0},
+	{"conf", ast_handle_data, 4},
+	{"func", ast_handle_method, 6},
+	{"inherit", ast_handle_inherit, 4},
+	{"include", ast_handle_include, 5},
+	{"require", ast_handle_include, 5},
+	{"addtask", ast_handle_addtask, 4},
+	{"deltask", ast_handle_deltask, 4},
+	{"addhandler", ast_handle_addhandler, 4},
+	{"export_funcs", ast_handle_export_funcs, 5},
+	{"unset", ast_handle_unset, 4},
+	{"exported", ast_handle_export, 4},
+	{"body", NULL, 0},
+	{"var", NULL, 0},
+	{"flag", NULL, 0},
+	{"exp", NULL, 0},
+	{"apo", NULL, 0},
+	{"python", ast_handle_python_method, 6},
+	{"fakeroot", NULL, 0},
+	{"after", NULL, 0},
+	{"before", NULL, 0},
+	{NULL, NULL, 0} /* sentinel */
 };
 
-void* types_get_ast_callback(enum node_type type) {
+static const gchar *op_table[] = {
+	"predot",
+	"postdot",
+	"prepend",
+	"append",
+	"colon",
+	"ques",
+	"lazyques",
+	"assign"
+};
+
+AstHandleFunc types_get_ast_callback(enum node_type type) {
 	return type_table[type].ast_callback;
+}
+
+gint types_get_ast_num_args(enum node_type type) {
+	return type_table[type].ast_num_args;
 }
 
 const gchar* types_itoa(enum node_type type) {
 	return type_table[type].name;
 }
 
-gchar* cbb_types_assign_op_itoa(enum assign_op op) {
-	gchar *str = NULL;
-	switch(op) {
-	case predot_assign:
-		str = g_strdup("predot");
-		break;
-	case postdot_assign:
-		str = g_strdup("postdot");
-		break;
-	case prepend_assign:
-		str = g_strdup("prepend");
-		break;
-	case append_assign:
-		str = g_strdup("append");
-		break;
-	case colon_assign:
-		str = g_strdup("colon");
-		break;
-	case ques_assign:
-		str = g_strdup("ques");
-		break;
-	case lazyques_assign:
-		str = g_strdup("lazyques");
-		break;
-	case assign:
-		str = g_strdup("assign");
-		break;
-	};
-
-	return str;
+const gchar* types_op_itoa(enum op_type op) {
+	return op_table[op];
 }

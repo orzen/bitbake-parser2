@@ -5,16 +5,17 @@
 #include "log.h"
 #include "node.h"
 #include "parser_types.h"
+#include "pyobj_ast.h"
+#include "pyobj_match.h"
 
-struct traverse_data {
-	GList *parents;
-	PyObject *list;
-	PyObject *tuple;
-};
-
-static gint convert_traverse_to_pydict(GNode *node, PyObject **dict) {
+static gint convert_child_to_pydict(PyDict *dict,
+                                    GNode *node,
+                                    AstHandleFunc ast_override) {
 	GNode *child = NULL;
 	struct node_int *internal = NULL;
+	gint r = -1;
+	const gchar *key = NULL;
+	PyObject *value = NULL;
 
 	if (node == NULL) {
 		log_warn("failed to traverse children, empty node");
@@ -25,16 +26,42 @@ static gint convert_traverse_to_pydict(GNode *node, PyObject **dict) {
 	     child != NULL;
 	     child = g_node_next_sibling(child)) {
 		internal = child->data;
-		g_warning("type: '%s', lineno: '%d'",
-		          types_itoa(internal->type), internal->lineno);
+
+		switch(internal->type) {
+		case body:
+			key = "value";
+			r = PyDict_SetItemString(dict, "apo",
+			                         internal->data[0]);
+			if (r != 0) {
+				log_warn("failed to add apo");
+				return -1;
+			}
+			break;
+		case exp:
+			key = "exp";
+			value = Py_True;
+			break;
+		default:
+			key = types_itoa(internal->type);
+			value = PyBytes_FromString(internal->data);
+		}
+
+		r = PyDict_SetItemString(dict, key, value);
+		if (r != 0) {
+			log_warn("failed to add key '%s', value '%s' to dict", key, val);
+			return -1;
+		}
 	}
 
 	return 0;
 }
 
-static gint convert_traverse_to_pylist(GNode *node, PyObject **list) {
+static gint convert_child_to_pylist(PyObject *list,
+                                    GNode *node,
+                                    AstHandleFunc ast_override) {
 	GNode *child = NULL;
 	struct node_int *internal = NULL;
+	gint r = -1;
 
 	if (node == NULL) {
 		log_warn("failed to traverse children, empty node");
@@ -44,20 +71,214 @@ static gint convert_traverse_to_pylist(GNode *node, PyObject **list) {
 	for (child = node->children;
 	     child != NULL;
 	     child = g_node_next_sibling(child)) {
+		PyObject *value = NULL;
 		internal = child->data;
-		g_warning("type: '%s', lineno: '%d'",
-		          types_itoa(internal->type), internal->lineno);
+
+		switch(internal->type) {
+		case:
+			value = PyLong_FromLong(internal->data);
+			break;
+		default:
+			value = PyBytes_FromString(internal->data);
+		}
+
+		r = PyList_Append(list, value);
+		if (r != 0) {
+			log_warn("failed to append item to list");
+			return -1;
+		}
 	}
 
 	return 0;
 }
 
-static gint convert_traverse_func(GNode *root,
-                                  gpointer user_data) {
+static gint convert_child_to_tuple(PyObject *tuple,
+                                   GNode *node,
+                                   AstHandleFunc ast_override) {
 	GNode *child = NULL;
 	struct node_int *internal = NULL;
+	gint i = 3;
+	gint r = -1;
 
-	if (root == NULL) {
+	if (tuple == NULL || node == NULL) {
+		log_warn("empty args");
+		return -1;
+	}
+
+	if (ast_override != NULL) {
+		log_warn("override already set");
+		return -1;
+	}
+
+	for (child = node->children;
+	     child != NULL;
+	     child = g_node_next_sibling(child)) {
+		PyObject *value = NULL;
+		internal = child->data;
+
+		switch(internal->type) {
+		case python:
+			ast_override = &ast_handle_python_method;
+		case fakeroot:
+			value = PyBool_FromLong(internal->data);
+			break;
+		default:
+			value = PyBytes_FromString(internal->data);
+		}
+
+		r = PyTuple_SetItem(tuple, i, value);
+		if (r != 0) {
+			log_warn("failed to add item to tuple");
+			return -1;
+		}
+
+		i++;
+	}
+
+	return 0;
+}
+
+static gint ast_request_add_generic(PyObject *tuple,
+                               PyObject *statements,
+                               gchar *filename,
+                               gint lineno) {
+
+	if (tuple == NULL || statements == NULL || filename == NULL) {
+		log_warn("empty args");
+		return -1;
+	}
+
+	r = PyTuple_SetItem(args, 0, statements);
+	if (r != 0) {
+		log_warn("failed to add statements to ast args");
+		return -1;
+	}
+	r = PyTuple_SetItem(args, 1, PyBytes_FromString(filename));
+	if (r != 0) {
+		log_warn("failed to add statements to ast args");
+		return -1;
+	}
+	r = PyTuple_SetItem(args, 2, PyLong_FromLong(lineno));
+	if (r != 0) {
+		log_warn("failed to add statements to ast args");
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * Returns a GList with two elements, callback function and callback args, on
+ * success, otherwise returns NULL.
+ */
+static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type type) {
+	PyObject *data = NULL;
+	PyObject *match = NULL;
+	gint r = -1;
+	GList *ret = NULL;
+	AstHandleFunc ast_func = NULL;
+
+	switch (type) {
+	case conf:
+		data = PyDict_New();
+		gint *op = NULL;
+
+		op = entry->data;
+
+		r = PyDict_SetItemString(data, types_op_itoa(*op), Py_True);
+		if (r != 0) {
+			log_warn("failed to add op to PyDict");
+			return NULL;
+		}
+
+		r = convert_child_to_pydict(data, child, ast_func);
+		break;
+	case addtask:
+		data = PyDict_New();
+
+		r = PyDict_SetItemString(data, "func", entry->data);
+		if (r != 0) {
+			log_warn("failed to add addtask to PyDict");
+			return NULL;
+		}
+
+		r = convert_child_to_pydict(data, node, ast_func);
+		break;
+	case deltask:
+		data = PyDict_New();
+		r = convert_child_to_pydict(data, node, ast_func);
+		break;
+	case func:
+		r = convert_child_to_tuple(args, node, ast_func);
+		data = args;
+		break;
+	default:
+		data = PyList_New();
+		r = convert_child_to_pylist(data, node, ast_func);
+	}
+
+	if (r != 0) {
+		log_warn("failed to convert child node to args");
+		return NULL;
+	}
+
+	if (PyList_CheckExact(data) == Py_True) {
+		match = Match_new_int();
+		r = Match_set_list(match, data);
+	} else if (PyDict_CheckExact(data) == Py_True) {
+		match = Match_new_int();
+		r = Match_set_dict(match, data);
+	}
+
+	if (ast_func == NULL) {
+		ast_func = types_get_ast_callback(type);
+	}
+
+	ret = g_list_append(NULL, ast_func);
+	ret = g_list_append(ret, data);
+
+	return ret;
+}
+
+static GList* construct_ast_request(GNode *entry,
+                                    PyObject *statements,
+                                    gchar *filename) {
+	struct node_int *internal = NULL;
+	PyObject *args = NULL;
+	gint type = -1;
+	gint num_args = 0;
+	gint r = -1;
+
+	internal = entry->data;
+	type = internal->type;
+
+	num_args = types_get_ast_num_args(type);
+
+	args = PyTuple_New(num_args);
+	if (args == NULL) {
+		log_warn("failed to create ast args");
+		return NULL;
+	}
+
+	r = ast_request_add_generic(args, statements, filename, internal->lineno);
+	if (r != 0) {
+		log_warn("failed to append generic information");
+		return NULL;
+	}
+
+	return ast_finalize_request(args, entry, type);
+}
+
+gint convert_ast_to_python(PyObject *ast,
+                           PyObject *statements,
+                           GNode *root,
+                           gchar *filename) {
+	GNode *child = NULL;
+	GList *func_and_args = NULL;
+	AstHandleFunc ast_handler = NULL;
+	PyObject *ast_args = NULL;
+
+	if (root == NULL || filename == NULL) {
 		log_warn("empty args");
 		return -1;
 	}
@@ -65,52 +286,22 @@ static gint convert_traverse_func(GNode *root,
 	for (child = root->children;
 	     child != NULL;
 	     child = g_node_next_sibling(child)) {
-		internal = child->data;
-		gint type = internal->type;
-		PyObject *args = NULL;
-		void *ast_callback;
-
-		args = PyDict_new();
-		if (args == NULL) {
-			log_warn("failed to create PyDict");
+		func_and_args = construct_ast_request(child,
+		                                      statements,
+		                                      filename);
+		if (func_and_args == NULL) {
+			log_warn("invalid AST data");
 			return -1;
 		}
 
-		g_warning("type: '%s', lineno: '%d'",
-		          types_itoa(internal->type), internal->lineno);
+		ast_handler = func_and_args->data;
+		//func_and_args = g_list_next(func_and_args);
+		ast_args = func_and_args->next->data;
 
-		if (internal->type == conf) {
-			gint *assign = NULL;
-			assign = internal->data;
-			g_warning("conf: '%s'", cbb_types_assign_op_itoa(*assign));
-			convert_traverse_to_pydict(child, );
-		} else {
-			g_warning("%s: '%s'", types_itoa(type),
-			          (gchar *) internal->data);
-			convert_traverse_to_pylist(child, );
-		}
-
-		//TODO create match-object
-
-		ast_callback = types_get_ast_callback(internal->type);
+		ast_handler(ast, ast_args);
 	}
 
 	return 0;
-}
-
-PyObject* convert_ast_to_python(GNode *root) {
-	struct traverse_data *u_data = NULL;
-
-	if (root == NULL) {
-		g_warning("unspecified root node");
-		return NULL;
-	}
-
-	u_data = calloc(1, sizeof(struct traverse_data));
-
-	convert_traverse_func(root, u_data);
-
-	return NULL;
 }
 
 PyObject* convert_seq_to_pylist(gchar *fmt, ...) {
@@ -165,311 +356,3 @@ PyObject* convert_seq_to_pylist(gchar *fmt, ...) {
 
 	return list;
 }
-
-#if 0
-#define GEN_CONVERT_KW(TYPE) \
-gint _convert_kw_##TYPE##(GHashTable *entry) { \
-	void *callback = &ast_handle_##TYPE; \
-}
-
-GEN_CONVERT_KW(inherit)
-GEN_CONVERT_KW(include)
-GEN_CONVERT_KW(require)
-#undef GEN_CONVERT_KW
-
-gint entry_to_match_obj(PyObject **res_dict, PyObject *ast, GHashTable *tbl) {
-	PyObject *obj_filename = NULL;
-	PyObject *obj_lineno = NULL;
-	PyObject *tmp_dict = NULL;
-	gint r = -1;
-
-	if (dict == NULL || tbl == NULL) {
-		g_warning("empty arguments");
-		return -1;
-	}
-
-	if (*dict != NULL) {
-		g_warning("pointer is already assigned");
-		return -1;
-	}
-
-	tmp_dict = PyDict_New();
-	if (tmp_dict == NULL) {
-		g_warning("failed to allocate PyDict");
-		return -1;
-	}
-
-	if (r != 0) {
-		g_warning("failed to configure match object");
-		Py_DECREF(tmp_dict);
-		Py_DECREF(obj_filename);
-		Py_DECREF(obj_lineno);
-		Py_DECREF(match);
-		return -1;
-	}
-
-	*res_dict = tmp_dict;
-
-	Py_DECREF(obj_filename);
-	Py_DECREF(obj_lineno);
-
-	return 0;
-}
-
-gint block_to_pydict(PyObject **dict, GHashTable *tbl) {
-	gchar *k_key = NULL;
-	gchar *k_expr = NULL;
-	gint *k_fakeroot = NULL;
-	gint *k_python = NULL;
-	PyObject *tmp_dict = NULL;
-	PyUnicode *uni_key = NULL;
-	PyUnicode *uni_expr = NULL;
-	PyUnicode *uni_fakeroot = NULL;
-	PyUnicode *uni_python = NULL;
-
-	k_key = g_hash_table_lookup(tbl, "key");
-	if (k_key == NULL) {
-		g_warning("key is missing");
-		return -1;
-	}
-	k_expr = g_hash_table_lookup(tbl, "expr");
-	if (k_expr == NULL) {
-		g_warning("expr is missing");
-		return -1;
-	}
-	k_fakeroot = g_hash_table_lookup(tbl, "fakeroot");
-	if (k_fakeroot == NULL) {
-		g_warning("fakeroot is missing");
-		return -1;
-	}
-	k_python = g_hash_table_lookup(tbl, "python");
-	if (k_python == NULL) {
-		g_warning("python is missing");
-		return -1;
-	}
-
-	tmp_dict = PyDict_New();
-	if (tmp_dict == NULL) {
-		g_warning("failed to allocate PyDict");
-		return -1;
-	}
-
-	uni_key = PyUnicode_FromString("key");
-	uni_expr = PyUnicode_FromString("expr");
-	uni_fakeroot = PyUnicode_FromString("fakeroot");
-	uni_python = PyUnicode_FromString("python");
-
-}
-
-static gint arrange_conf(PyObject **dict, GHashTable *tbl) {
-	gchar *k_key    = NULL;
-	gchar *k_val    = NULL;
-	gchar *k_flag   = NULL;
-	gchar *k_quote  = NULL;
-	gchar *k_op     = NULL;
-	gchar *k_export = NULL;
-	PyObject *tmp_dict = NULL;
-	PyUnicode *uni_key    = NULL;
-	PyUnicode *uni_val    = NULL;
-	PyUnicode *uni_flags  = NULL;
-	PyUnicode *uni_quote  = NULL;
-	PyUnicode *uni_op     = NULL;
-	PyUnicode *uni_export = NULL;
-
-	if (dict == NULL || tbl == NULL) {
-		g_warning("empty arguments");
-		return -1;
-	}
-
-	if (*dict != NULL) {
-		g_warning("pointer is already assigned");
-		return -1;
-	}
-
-	uni_key    = PyUnicode_FromString("key");
-	uni_val    = PyUnicode_FromString("val");
-	uni_flags  = PyUnicode_FromString("flag");
-	uni_quote  = PyUnicode_FromString("quote");
-	uni_op     = PyUnicode_FromString("op");
-	uni_export = PyUnicode_FromString("export");
-
-	k_key    = g_hash_table_lookup(tbl, "key");
-	k_val    = g_hash_table_lookup(tbl, "val");
-	k_flag   = g_hash_table_lookup(tbl, "flag");
-	k_quote  = g_hash_table_lookup(tbl, "quote");
-	k_op     = g_hash_table_lookup(tbl, "op");
-	k_export = g_hash_table_lookup(tbl, "export");
-
-}
-
-static _include_to_match() {
-	PyObject *match_obj = NULL;
-
-	match_obj = Match_new_int();
-}
-
-static PyObject* convert_kw_to_match_list(enum kw_type kw_t, GHashTable *tbl) {
-	gint *k_keyword = NULL;
-	gchar *k_expr   = NULL;
-	gint *k_export  = NULL;
-	PyObject *match = NULL;
-
-	PyUnicode *uni_quote  = PyUnicode_FromString("keyword");
-	PyUnicode *uni_expr   = PyUnicode_FromString("expr");
-
-	match = Match_new_int();
-	if (match == NULL) {
-		g_warning("failed to create match object");
-		return -1;
-	}
-
-	expr = g_hash_table_lookup(tbl, "expr");
-
-	switch (kw_t) {
-	case inherit:
-	case include:
-	case require:
-		convert_va_args_to_pylist("is", kw_t, expr);
-		break;
-	case export_funcs:
-		break;
-	case deltask:
-		break;
-	};
-
-	match__set_list();
-	match__set_dict();
-
-	return match;
-}
-
-static PyObject* convert_sl_to_list() {
-	/*
-	 * handleExport
-	 * handleUnset
-	 * handleUnsetFlag
-	 * handleData
-	 */
-
-}
-
-static PyObject* arrange_addtask() {
-	PyUnicode *uni_content = PyUnicode_FromString("content");
-	PyUnicode *uni_after   = PyUnicode_FromString("after");
-	PyUnicode *uni_before  = PyUnicode_FromString("before");
-
-	gchar *k_content = g_hash_table_lookup(tbl, "content");
-	gchar *k_after   = g_hash_table_lookup(tbl, "after");
-	gchar *k_before  = g_hash_table_lookup(tbl, "before");
-
-}
-
-static gint propagate_block_stmt(PyObject *ast, GHashTable *tbl,
-                                 const gchar *filename, gint lineno) {
-	gchar *key = NULL;
-	gchar *expr = NULL;
-	gint *fakeroot = NULL;
-	gint *python = NULL;
-
-	if (ast == NULL || tbl == NULL || filename == NULL) {
-		g_warning("empty args");
-		return -1;
-	}
-
-	key = g_hash_table_lookup(tbl, "key");
-	expr = g_hash_table_lookup(tbl, "expr");
-	fakeroot = g_hash_table_lookup(tbl, "fakeroot");
-	python = g_hash_table_lookup(tbl, "python");
-}
-
-static gint propagate_conf_stmt(PyObject *ast, GHashTable *tbl,
-                                const gchar *filename, gint lineno) {
-	gchar *key = NULL;
-	gchar *val = NULL;
-	gchar *flag = NULL;
-	gint *quote = NULL;
-	gint *op = NULL;
-	gint *export = NULL;
-
-	if (ast == NULL || tbl == NULL || filename == NULL) {
-		g_warning("empty args");
-		return -1;
-	}
-
-	key = g_hash_table_lookup(tbl, "key");
-	val = g_hash_table_lookup(tbl, "val");
-	flag = g_hash_table_lookup(tbl, "expr");
-	quote = g_hash_table_lookup(tbl, "quote");
-	op = g_hash_table_lookup(tbl, "op");
-	export = g_hash_table_lookup(tbl, "export");
-
-}
-
-static gint propagate_kw_stmt(PyObject *ast, GHashTable *tbl,
-                              const gchar *filename, gint lineno) {
-	gchar *keyword = NULL;
-	gchar *expr = NULL;
-	gint *export = NULL;
-
-	if (ast == NULL || tbl == NULL || filename == NULL) {
-		g_warning("empty args");
-		return -1;
-	}
-
-	keyword = g_hash_table_lookup(tbl, "keyword");
-	expr = g_hash_table_lookup(tbl, "expr");
-	export = g_hash_table_lookup(tbl, "export");
-}
-
-static gint propagate_addtask_stmt(PyObject *ast, GHashTable *tbl,
-                                   const gchar *filename, gint lineno) {
-	gchar *content = NULL;
-	gchar *after = NULL;
-	gchar *before = NULL;
-	gint *export = NULL;
-
-	if (ast == NULL || tbl == NULL || filename == NULL) {
-		g_warning("empty args");
-		return -1;
-	}
-
-	key = g_hash_table_lookup(tbl, "key");
-	expr = g_hash_table_lookup(tbl, "expr");
-	fakeroot = g_hash_table_lookup(tbl, "fakeroot");
-	python = g_hash_table_lookup(tbl, "python");
-
-}
-
-gint propagate_arbitrary(PyObject *ast, GHashTable *tbl) {
-	gchar *filename = NULL;
-	gint *lineno = NULL;
-	gint *type = NULL;
-	gint r = -1;
-
-	if (ast == NULL || tbl == NULL) {
-		g_warning("empty args");
-		return -1;
-	}
-
-	filename = g_hash_table_lookup(tbl, "filename");
-	lineno = g_hash_table_lookup(tbl, "lineno");
-	type = g_hash_table_lookup(tbl, "type");
-
-	switch (*type) {
-		case block: 
-			r = propagate_block_stmt(ast, tbl, filename, *lineno);
-			break;
-		case conf:
-			r = propagate_conf_stmt(ast, tbl, filename, *lineno);
-			break;
-		case kw:
-			r = propagate_kw_stmt(ast, tbl, filename, *lineno);
-			break;
-		case addtask:
-			r = propagate_addtask_stmt(ast, tbl, filename, *lineno);
-			break;
-	}
-
-	return r;
-}
-#endif

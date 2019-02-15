@@ -2,203 +2,77 @@
 #include <Python.h>
 #include <stdarg.h>
 
+#include "log.h"
+
 static const gchar *PACKAGE_VERSION = "0.0.1";
 static PyObject *REMOCK_ERROR;
 
-#define DEBUG g_warning("%s:%s:%d", __FILE__, __func__, __LINE__);
-#define FAIL(msg) PyErr_SetString(REMOCK_ERROR, "argument must be a dict");
-
 struct match_data {
 	PyObject_HEAD
-	PyObject *value_obj;
-	GList *value_list;
+	PyObject *dict;
+	PyObject *list;
 } MatchData;
-
 
 static PyObject* Match_group(struct match_data *self, PyObject *args) {
 	gchar *value = NULL;
 	gint idx = -1;
 	gint r = -1;
-
-	DEBUG
+	PyObject *value = NULL;
+	PyObject *index = NULL;
 
 	if (self == NULL || args == NULL) {
-		g_warning("one or more of the arguments is NULL");
-		return NULL;
+		PY_ERROR("one or more of the arguments is NULL");
+		return Py_None;
 	}
 
-	r = PyArg_ParseTuple(args, "i", &idx);
+	r = PyArg_ParseTuple(args, "O", &index);
 	if (r != 0) {
-		g_warning("failed to parse args");
-		return NULL;
+		PY_ERROR("failed to parse args");
+		return Py_None;
+	}
+
+	if (PyUnicode_Check(index) == Py_True) {
+		log_warn("ARG UNICODE");
+	} else if (PyLong_Check(index) == Py_True) {
+		log_warn("ARG LONG");
+	} else if (PyBytes_Check(index) == Py_True) {
+		log_warn("ARG BYTES");
 	}
 
 	if (idx < 0) {
-		g_warning("index out of range");
-		return NULL;
+		PY_ERROR("index out of range");
+		return Py_None;
 	}
 
-	value = g_list_nth_data(self->value_list, idx);
+	value = PyList_GetItem(self->list, idx);
 	if (value == NULL) {
-		g_warning("value is NULL");
+		PY_ERROR("value is NULL");
+		return Py_None;
 	}
 
-	return Py_BuildValue("s", value);
+	return Py_BuildValue("O", value);
 }
 
-
-static PyObject* arrange_kw(GHashTable *tbl) {
-	gchar *expr = NULL;
-	gint *export  = NULL;
-	gint *kw = NULL;
-	gchar *keyword = NULL;
-	PyObject *list = NULL;
-	gint r = -1;
-
-	if (tbl == NULL) {
-		g_warning("empty args");
-		return NULL;
-	}
-
-	kw = g_hash_table_lookup(tbl, "keyword");
-	if (kw == NULL) {
-		g_warning("keyword is not specified");
-		return NULL;
-	}
-
-	expr = g_hash_table_lookup(tbl, "expr");
-	if (expr == NULL) {
-		g_warning("empty keyword expression");
-	}
-
-	list = PyList_New(2);
-	if (list == NULL) {
-		g_warning("failed to allocate PyList");
-		return NULL;
-	}
-
-	keyword = cbb_types_kw_itoa(*kw);
-	r = PyList_Append(list, PyUnicode_FromString(keyword));
-	g_free(keyword);
-	if (r != 0) {
-		g_warning("failed to append keyword");
-		Py_DECREF(list);
-		return NULL;
-	}
-
-	r = PyList_Append(list, PyUnicode_FromString(expr));
-	if (r != 0) {
-		g_warning("failed to append keyword expression");
-		Py_DECREF(list);
-		return NULL;
-	}
-
-	return list;
-}
-
-static gint Match_set_int(PyObject *self, enum parser_type type,  GHashTable *tbl) {
-	gint *entry_type = NULL;
-	PyObject *group_list = NULL;
-
-	if (self == NULL || tbl == NULL) {
-		g_warning("empty args");
-		return NULL;
-	}
-
-	entry_type = g_hash_table_lookup(tbl, "type");
-	if (entry_type == NULL) {
-		g_warning("entry is missing type info");
-		return NULL;
-	}
-
-	switch(*entry_type) {
-		case block:
-			arrange_block();
-			break;
-		case conf:
-			arrange_conf();
-			break;
-		case kw:
-			group_list = arrange_kw(tbl);
-			break;
-		case addtask:
-			arrange_addtask();
-			break;
-	};
-
-	if (group_list == NULL) {
-		g_warning("failed to create group list");
+gint Match_set_dict(PyObject *self, PyObject *dict) {
+	if (self == NULL || dict == NULL) {
+		log_warn("empty args");
 		return -1;
 	}
+
+	self->dict = dict;
+
+	return 0;
 }
 
-static PyObject* Match_va_set(PyObject *self, PyObject *args) {
-	PyObject *arg_dict = NULL;
-	PyObject *type_obj = NULL;
-	PyObject *type_uni = NULL;
-	gint type_int = NULL;
-	gint i = -1;
-	gint r = -1;
-
-	DEBUG
-
-	if (self == NULL || args == NULL) {
-		g_warning("self or format is NULL");
-		return Py_False;
+gint Match_set_list(PyObject *self, PyObject *list) {
+	if (self == NULL || list == NULL) {
+		log_warn("empty args");
+		return -1;
 	}
 
-	DEBUG
+	self->list = list;
 
-	r = PyArg_ParseTuple(args, "O!", &PyDict_Type, &arg_dict);
-
-	DEBUG
-	if (!r) {
-		PyErr_SetString(REMOCK_ERROR, "argument must be a dict");
-		g_warning("failed to parse args");
-		return Py_False;
-	}
-
-	DEBUG
-
-	if (arg_dict == NULL) {
-		g_warning("empty arguments!");
-		return Py_False;
-	}
-
-	if (PyDict_CheckExact(arg_dict) != TRUE) {
-		g_warning("argument is a derivative from dict");
-		return Py_False;
-	}
-
-	DEBUG
-	type_uni = PyUnicode_FromString("type");
-	type_obj = PyDict_GetItem(arg_dict, type_uni);
-	Py_DECREF(type_uni);
-	type_int = PyLong_AsLong(type_o);
-
-	switch(type_int) {
-		case block:
-			arrange_block();
-			break;
-		case conf:
-			arrange_conf();
-			break;
-		case kw:
-			arrange_kw();
-			break;
-		case addtask:
-			arrange_addtask();
-			break;
-	};
-	g_warning("TYPE: '%d'", type_int);
-
-	return Py_True;
-
-#if 0
-	self->value_obj = obj;
-	self->value_list = list;
-#endif
-
+	return 0;
 }
 
 static void Match_dealloc(struct match_data *self) {
@@ -208,6 +82,8 @@ static void Match_dealloc(struct match_data *self) {
 
 	Py_XDECREF(self->value_obj);
 
+	Py_XDECREF(self->dict);
+	Py_XDECREF(self->list);
 	Py_TYPE(self)->tp_free((PyObject*) self);
 }
 
@@ -216,7 +92,7 @@ PyObject* Match_new_int() {
 	PyObject *match_kwds = NULL;
 	PyObject *match_obj = NULL;
 
-	match_args = Py_BuildValue("s", "internal");
+	match_args = Py_BuildValue("");
 	match_kwds = PyDict_New();
 
 	match_obj = Match_new(&Match_type, match_args, match_kwds);
@@ -236,6 +112,16 @@ static PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 	if (self != NULL) {
 		self->value_obj = Py_None;
 		self->value_list = NULL;
+
+		self->dict = PyDict_New();
+		if (self->dict == NULL) {
+			log_warn("failed to allocate dict for Match object");
+		}
+
+		self->list = PyList_New();
+		if (self->list == NULL) {
+			log_warn("failed to allocate list for Match object");
+		}
 	}
 
 	return (PyObject*) self;
@@ -248,24 +134,15 @@ static gint Match_init(struct match_data *self, PyObject *args, PyObject *kwds) 
 	g_warning("__INIT__");
 
 	if (args == NULL) {
-		return -1;
-	}
-
-	r = PyArg_ParseTuple(args, "s", &pattern);
-	if (r != 0) {
+		PY_ERROR("empty args");
 		return -1;
 	}
 
 	return 0;
 }
 
-static PyObject* Match_stub() {
-	return NULL;
-}
-
 static PyMethodDef Match_methods[] = {
 	{"group", (PyCFunction) Match_group, METH_VARARGS, "Stubbed alternative for Match.group"},
-	{"set",  (PyCFunction) Match_va_set, METH_VARARGS, "Stubbed alternative for re.match"},
 	{} /* sentinel */
 };
 

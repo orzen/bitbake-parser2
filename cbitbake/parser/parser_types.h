@@ -3,6 +3,8 @@
 
 #include <glib.h>
 
+#include "pyobj_ast.h"
+
 enum node_type {
 	root = 0,
 	conf,
@@ -15,12 +17,14 @@ enum node_type {
 	addhandler,
 	export_funcs,
 	unset,
+	exported,
 /* === Sub-types ===  */
 	body,
 /* Assign-types */
 	var,
 	flag,
-	exported,
+	exp_var,
+	apo,
 /* Func-types */
 	python,
 	fakeroot,
@@ -29,7 +33,7 @@ enum node_type {
 	before
 };
 
-enum assign_op {
+enum op_type {
 	predot_assign = 0,
 	postdot_assign,
 	prepend_assign,
@@ -45,7 +49,9 @@ enum quote_type {
 	double_quote
 };
 
+AstHandleFunc types_get_ast_callback(enum node_type type);
+gint types_get_ast_num_args(enum node_type type);
 const gchar* types_itoa(enum node_type type);
-gchar* cbb_types_assign_op_itoa(enum assign_op op);
+const gchar* types_op_itoa(enum op_type op);
 
 #endif

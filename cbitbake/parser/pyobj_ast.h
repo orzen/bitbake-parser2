@@ -3,31 +3,31 @@
 
 #include <Python.h>
 
-void ast_handle_method(PyObject *ast);
+typedef void (*AstHandleFunc) (PyObject *ast,
+                               PyObject *args);
 
-void ast_handle_python_method(PyObject *ast);
+void ast_handle_method(PyObject *ast, PyObject *args);
 
-void ast_handle_export(PyObject *ast);
+void ast_handle_python_method(PyObject *ast, PyObject *args);
 
-void ast_handle_addtask(PyObject *ast);
+void ast_handle_export(PyObject *ast, PyObject *args);
 
-void ast_handle_deltask(PyObject *ast);
+void ast_handle_export_funcs(PyObject *ast, PyObject *args);
 
-void ast_handle_add_handler(PyObject *ast);
+void ast_handle_addtask(PyObject *ast, PyObject *args);
 
-void ast_handle_inherit(PyObject *ast);
+void ast_handle_deltask(PyObject *ast, PyObject *args);
 
-void ast_handle_data(PyObject *ast);
+void ast_handle_addhandler(PyObject *ast, PyObject *args);
 
-void ast_handle_unset(PyObject *ast, gchar *flag);
+void ast_handle_inherit(PyObject *ast, PyObject *args);
 
-void ast_handle_unset_flag(PyObject *ast);
+void ast_handle_data(PyObject *ast, PyObject *args);
 
-void ast_handle_include(PyObject *ast,
-                        const PyObject *statements,
-                        const PyObject *filename,
-                        const PyObject *lineno,
-                        const PyObject *match,
-                        const PyObject *force);
+void ast_handle_unset(PyObject *ast, PyObject *args);
+
+void ast_handle_unset_flag(PyObject *ast, PyObject *args);
+
+void ast_handle_include(PyObject *ast, PyObject *args);
 
 #endif

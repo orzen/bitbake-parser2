@@ -67,20 +67,24 @@ statement:
 block_stmt:
 	BLOCK_START block_expr {
 		$$ = new_str(func, $1);
-		$$ = append_str($$, body, $2); }
+		$$ = append_str($$, body, $2);
+		$$ = append_int($$, python, 0);
+		$$ = append_int($$, fakeroot, 0); }
 	| FAKEROOT BLOCK_START block_expr {
 		$$ = new_str(func, $2);
-		$$ = append_int($$, fakeroot, 1);
-		$$ = append_str($$, body, $3); }
+		$$ = append_str($$, body, $3);
+		$$ = append_int($$, python, 0);
+		$$ = append_int($$, fakeroot, 1); }
 	| PYTHON BLOCK_START block_expr {
 		$$ = new_str(func, $2);
+		$$ = append_str($$, body, $3);
 		$$ = append_int($$, python, 1);
-		$$ = append_str($$, body, $3); }
+		$$ = append_int($$, fakeroot, 0); }
 	| FAKEROOT PYTHON BLOCK_START block_expr {
 		$$ = new_str(func, $3);
-		$$ = append_int($$, fakeroot, 1);
+		$$ = append_str($$, body, $4);
 		$$ = append_int($$, python, 1);
-		$$ = append_str($$, body, $4); }
+		$$ = append_int($$, fakeroot, 1); }
 	;
 
 block_expr:
@@ -112,7 +116,8 @@ assign_op:
 	;
 
 export_stmt:
-	EXPORT conf_stmt { $$ = append_int($2, exported, 1); }
+	EXPORT conf_stmt { $$ = append_int($2, exp_var, 1); }
+	| EXPORT WORD { $$ = new_str(exported, $2); }
 	;
 
 sli_stmt:
