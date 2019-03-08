@@ -3,31 +3,30 @@
 
 #include <Python.h>
 
-typedef void (*AstHandleFunc) (PyObject *ast,
-                               PyObject *args);
+typedef void (*AstHandleFunc) (PyObject *args);
 
-void ast_handle_method(PyObject *ast, PyObject *args);
+void ast_handleMethod(PyObject *args);
 
-void ast_handle_python_method(PyObject *ast, PyObject *args);
+void ast_handlePythonMethod(PyObject *args);
 
-void ast_handle_export(PyObject *ast, PyObject *args);
+void ast_handleExport(PyObject *args);
 
-void ast_handle_export_funcs(PyObject *ast, PyObject *args);
+void ast_handleExportFuncs(PyObject *args);
 
-void ast_handle_addtask(PyObject *ast, PyObject *args);
+void ast_handleAddTask(PyObject *args);
 
-void ast_handle_deltask(PyObject *ast, PyObject *args);
+void ast_handleDelTask(PyObject *args);
 
-void ast_handle_addhandler(PyObject *ast, PyObject *args);
+void ast_handleBBHandlers(PyObject *args);
 
-void ast_handle_inherit(PyObject *ast, PyObject *args);
+void ast_handleInherit(PyObject *args);
 
-void ast_handle_data(PyObject *ast, PyObject *args);
+void ast_handleData(PyObject *args);
 
-void ast_handle_unset(PyObject *ast, PyObject *args);
+void ast_handleUnset(PyObject *args);
 
-void ast_handle_unset_flag(PyObject *ast, PyObject *args);
+void ast_handleUnsetFlag(PyObject *args);
 
-void ast_handle_include(PyObject *ast, PyObject *args);
+void ast_handleInclude(PyObject *args);
 
 #endif

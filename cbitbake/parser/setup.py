@@ -1,73 +1,77 @@
 import os
 import re
+import subprocess
 from distutils.core import setup, Extension
 
-SOURCE_PATTERN = re.compile("\S+\.c")
+def locate_files(path):
+    sources = []
+    makefile = False
 
-def locate_filenames(filename):
-    filenames = []
+    for root, dirs, files in os.walk(path):
+        sources = [f for f in files if f.endswith('.c')]
+        makefile = True if "Makefile" in files else False
 
-    for root, dirs, files in os.walk('.'):
-        if filename in files:
-            filenames.append((root, filename))
+    return makefile, sources
 
-    return filenames
+def makefile_pkg_configs(file_path):
+    with open(file_path) as f:
+        re.match('\s*PKGS\s*=\s*(.*)', f.read())
+        return m.group(1).split(' ') if m else None
 
+def pkg_config_cflags(pkg_configs):
+    return [subprocess.check_output(['pkg-config', '--cflags', pkg_config]).decode('utf-8').strip('\n') for pkg_config in pkg_configs]
 
-def find_extensions():
-    def find_sources(filename):
-        with open(filename) as file:
-            lines = file.read()
-            return re.findall(SOURCE_PATTERN, lines)
+def pkg_config_libs(pkg_configs):
+    return [subprocess.check_output(['pkg-config', '--libs', pkg_config]).decode('utf-8').strip('\n') for pkg_config in pkg_configs]
 
-    extensions = []
-    makefiles = locate_filenames('Makefile')
+def include_dirs_from_cflags(cflags):
+    return [flag[2:] for flag in cflags if flag.startswith('-I')]
 
-    for path, makefile in makefiles:
-            sources = find_sources(os.path.join(path, makefile))
+def libraries_from_libs(libs):
+    return [lib[2:] for lib in libs if lib.startswith('-l')]
 
-            path = path.strip('./')
-            sources = [ os.path.join(path, source) for source in sources ]
+def construct_extension(path):
+    cflags = []
+    libs = []
 
-            extension = Extension(path.strip('./'),
-                                  sources)
-            extensions.append(extension)
+    makefile, sources = locate_files(path)
 
-    return extensions
+    if makefile:
+        pkg_configs = makefile_pkg_configs(os.path.join(path, 'Makefile'))
 
+        cflags = pkg_config_cflags(pkg_configs)
+        libs = pkg_config_libs(pkg_configs)
+
+    return Extension(os.path.basename(path),
+                     include_dirs = include_dirs_from_cflags(cflags),
+                     libraries = libraries_from_libs(libs),
+                     sources = sources)
 
 
 version = '0.0.1'
 
-#if __name__ == '__main__':
-#    ext = find_extensions()
-#    print("EXT '{}'".format(str(ext)))
+#parser = Extension('parser',
+#                   include_dirs = [
+#                       '/usr/include/glib-2.0',
+#                       '/usr/lib/x86_64-linux-gnu/glib-2.0/include'
+#                       ],
+#                   libraries = ['glib-2.0'],
+#                   sources = [
+#                       'args.c',
+#                       'files.c',
+#                       'lex.yy.c',
+#                       'main.c',
+#                       'parser.tab.c',
+#                       'python_bindings.c',
+#                       'python_utils.c',
+#                       'pyobj_d.c',
+#                       'pyobj_match_mock.c',
+#                       'utils.c'
+#                       ])
 
-parser = Extension('cbbparser',
-                   include_dirs = ['/usr/include/glib-2.0',
-                       '/usr/lib/x86_64-linux-gnu/glib-2.0/include'],
-                   libraries = ['glib-2.0'],
-                   sources = ['args.c',
-                              'files.c',
-                              'lex.yy.c',
-                              'main.c',
-                              'parser.tab.c',
-                              'python_bindings.c',
-                              'python_utils.c',
-                              'pyobj_d.c',
-                              'pyobj_match_mock.c',
-                              'utils.c'])
-
-remock = Extension('remock',
-                   include_dirs = ['/usr/include/glib-2.0',
-                       '/usr/lib/x86_64-linux-gnu/glib-2.0/include'],
-                   libraries = ['glib-2.0'],
-                   sources = ['pyobj_match_mock.c',
-                              ])
-
-
+parser = construct_extension(os.path.abspath('.'))
 
 setup(name = 'cparser',
       version = version,
       description = 'C implementation of bitbake parser',
-      ext_modules = [parser, remock])
+      ext_modules = [parser])

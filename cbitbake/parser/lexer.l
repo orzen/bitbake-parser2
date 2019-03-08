@@ -129,8 +129,6 @@ WORD [a-zA-Z0-9_\.'\$\{\}-]
 .                   { fprintf(stderr, "\nUnrecognized character '%s', '%d: %d'\n", yytext, row_num, col_num); exit(-1); }
 %%
 
-//"["|"]"|"("|")"|"{"|"}"      { count(yyscanner); return yytext[0]; }
-
 gchar* duptext(yyscan_t scanner) {
 	gchar *tmp = NULL;
 	gint len = -1;
@@ -155,7 +153,6 @@ void count(yyscan_t scanner) {
 
 	len = yyget_leng(scanner);
 	text = yyget_text(scanner);
-	//text[len - 1] = '\0';
 
 	for (i = 0; text[i] != '\0'; i++) {
 		if (text[i] == '\n') {
@@ -223,7 +220,7 @@ GNode* cbb_parse_file(const gchar *fn) {
 
 	if (acc == NULL) {
 		g_warning("acc is NULL\n");
-	} 
+	}
 
 	return acc;
 }

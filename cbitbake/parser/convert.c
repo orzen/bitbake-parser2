@@ -7,8 +7,33 @@
 #include "parser_types.h"
 #include "pyobj_ast.h"
 #include "pyobj_match.h"
+#include "string.h"
 
-static gint convert_child_to_pydict(PyDict *dict,
+static gint convert_handle_apo(PyObject *dict, const gchar *str) {
+	PyObject *apo = NULL;
+	gint r = -1;
+
+	if (dict == NULL || str == NULL) {
+		log_warn("empty args");
+		return -1;
+	}
+
+	apo = PyUnicode_FromFormat("c", str[0]);
+	if (apo == NULL) {
+		log_warn("failed to create object for apo");
+		return -1;
+	}
+
+	r = PyDict_SetItemString(dict, "apo", apo);
+	if (r != 0) {
+		log_warn("failed to add apo to dict");
+		return -1;
+	}
+
+	return 0;
+}
+
+static gint convert_child_to_pydict(PyObject *dict,
                                     GNode *node,
                                     AstHandleFunc ast_override) {
 	GNode *child = NULL;
@@ -30,27 +55,32 @@ static gint convert_child_to_pydict(PyDict *dict,
 		switch(internal->type) {
 		case body:
 			key = "value";
-			r = PyDict_SetItemString(dict, "apo",
-			                         internal->data[0]);
+			r = convert_handle_apo(dict, internal->data);
 			if (r != 0) {
-				log_warn("failed to add apo");
 				return -1;
 			}
 			break;
-		case exp:
+		case exp_var:
 			key = "exp";
 			value = Py_True;
 			break;
 		default:
 			key = types_itoa(internal->type);
-			value = PyBytes_FromString(internal->data);
+		}
+
+		if (value != NULL) {
+			value = PyUnicode_FromString(internal->data);
 		}
 
 		r = PyDict_SetItemString(dict, key, value);
 		if (r != 0) {
-			log_warn("failed to add key '%s', value '%s' to dict", key, val);
+			log_warn("failed to add key '%s' to dict", key);
 			return -1;
 		}
+
+		key = NULL;
+		Py_DECREF(value);
+		value = NULL;
 	}
 
 	return 0;
@@ -74,19 +104,15 @@ static gint convert_child_to_pylist(PyObject *list,
 		PyObject *value = NULL;
 		internal = child->data;
 
-		switch(internal->type) {
-		case:
-			value = PyLong_FromLong(internal->data);
-			break;
-		default:
-			value = PyBytes_FromString(internal->data);
-		}
+		value = PyBytes_FromString(internal->data);
 
 		r = PyList_Append(list, value);
 		if (r != 0) {
 			log_warn("failed to append item to list");
 			return -1;
 		}
+
+		Py_DECREF(value);
 	}
 
 	return 0;
@@ -118,9 +144,9 @@ static gint convert_child_to_tuple(PyObject *tuple,
 
 		switch(internal->type) {
 		case python:
-			ast_override = &ast_handle_python_method;
+			ast_override = &ast_handlePythonMethod;
 		case fakeroot:
-			value = PyBool_FromLong(internal->data);
+			value = Py_True;
 			break;
 		default:
 			value = PyBytes_FromString(internal->data);
@@ -138,12 +164,13 @@ static gint convert_child_to_tuple(PyObject *tuple,
 	return 0;
 }
 
-static gint ast_request_add_generic(PyObject *tuple,
-                               PyObject *statements,
-                               gchar *filename,
-                               gint lineno) {
+static gint ast_request_add_generic(PyObject *args,
+                                    PyObject *statements,
+                                    gchar *filename,
+                                    gint lineno) {
+	gint r = -1;
 
-	if (tuple == NULL || statements == NULL || filename == NULL) {
+	if (args == NULL || statements == NULL || filename == NULL) {
 		log_warn("empty args");
 		return -1;
 	}
@@ -171,7 +198,7 @@ static gint ast_request_add_generic(PyObject *tuple,
  * Returns a GList with two elements, callback function and callback args, on
  * success, otherwise returns NULL.
  */
-static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type type) {
+static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type type, gchar *filename) {
 	PyObject *data = NULL;
 	PyObject *match = NULL;
 	gint r = -1;
@@ -191,7 +218,7 @@ static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type 
 			return NULL;
 		}
 
-		r = convert_child_to_pydict(data, child, ast_func);
+		r = convert_child_to_pydict(data, entry, ast_func);
 		break;
 	case addtask:
 		data = PyDict_New();
@@ -202,19 +229,19 @@ static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type 
 			return NULL;
 		}
 
-		r = convert_child_to_pydict(data, node, ast_func);
+		r = convert_child_to_pydict(data, entry, ast_func);
 		break;
 	case deltask:
 		data = PyDict_New();
-		r = convert_child_to_pydict(data, node, ast_func);
+		r = convert_child_to_pydict(data, entry, ast_func);
 		break;
 	case func:
-		r = convert_child_to_tuple(args, node, ast_func);
+		r = convert_child_to_tuple(args, entry, ast_func);
 		data = args;
 		break;
 	default:
-		data = PyList_New();
-		r = convert_child_to_pylist(data, node, ast_func);
+		data = PyList_New(0);
+		r = convert_child_to_pylist(data, entry, ast_func);
 	}
 
 	if (r != 0) {
@@ -222,12 +249,46 @@ static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type 
 		return NULL;
 	}
 
-	if (PyList_CheckExact(data) == Py_True) {
-		match = Match_new_int();
-		r = Match_set_list(match, data);
-	} else if (PyDict_CheckExact(data) == Py_True) {
-		match = Match_new_int();
-		r = Match_set_dict(match, data);
+	if (PyList_CheckExact(data) == 1) {
+		match = Match_new_int(NULL, data);
+	} else if (PyDict_CheckExact(data) == 1) {
+		match = Match_new_int(data, NULL);
+	}
+
+	if (type == conf) {
+		r = PyTuple_SetItem(args, 3, data);
+		if (r != 0) {
+			log_warn("failed to add data object to args");
+			return NULL;
+		}
+	} else {
+		r = PyTuple_SetItem(args, 3, match);
+		if (r != 0) {
+			log_warn("failed to add match object to args");
+			return NULL;
+		}
+	}
+
+	if (type == export_funcs) {
+		gchar *pos = NULL;
+
+		// Removing the bbclass file suffix
+		pos = strrchr(filename, '.');
+		if (pos == NULL) {
+			log_warn("classname does not contain a '.'");
+			return NULL;
+		}
+
+		// NOTE: This is not thread safe since it's working directly on
+		// a shared string instead of a copy.
+		*pos = '\0';
+
+		r = PyTuple_SetItem(args, 4, PyUnicode_FromString(filename));
+		*pos = '.';
+		if (r != 0) {
+			log_warn("failed to add match object to args");
+			return NULL;
+		}
 	}
 
 	if (ast_func == NULL) {
@@ -266,11 +327,10 @@ static GList* construct_ast_request(GNode *entry,
 		return NULL;
 	}
 
-	return ast_finalize_request(args, entry, type);
+	return ast_finalize_request(args, entry, type, filename);
 }
 
-gint convert_ast_to_python(PyObject *ast,
-                           PyObject *statements,
+gint convert_ast_to_python(PyObject *statements,
                            GNode *root,
                            gchar *filename) {
 	GNode *child = NULL;
@@ -295,15 +355,15 @@ gint convert_ast_to_python(PyObject *ast,
 		}
 
 		ast_handler = func_and_args->data;
-		//func_and_args = g_list_next(func_and_args);
 		ast_args = func_and_args->next->data;
 
-		ast_handler(ast, ast_args);
+		ast_handler(ast_args);
 	}
 
 	return 0;
 }
 
+#if 0
 PyObject* convert_seq_to_pylist(gchar *fmt, ...) {
 	va_list ap;
 	gint d;
@@ -356,3 +416,4 @@ PyObject* convert_seq_to_pylist(gchar *fmt, ...) {
 
 	return list;
 }
+#endif

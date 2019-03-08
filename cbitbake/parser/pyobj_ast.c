@@ -1,54 +1,129 @@
 #include <glib.h>
 #include <Python.h>
 
-#if 0
-void ast_handle_entry(PyObject *ast, GHashTable *entry) {
-	gchar *filename = NULL;
-	gint *lineno = NULL;
-	gint *type = NULL;
+#include "log.h"
+#include "pyobj_ast.h"
+#include "python_utils.h"
 
-	filename = g_hash_table_lookup(tbl, "filename");
-	lineno = g_hash_table_lookup(tbl, "lineno");
-	type = g_hash_table_lookup(tbl, "type");
-	if (filename == NULL || lineno == NULL || type == NULL) {
-		g_warning("empty generic values");
-		return -1;
-	}
+static GHashTable *ast_method_table;
 
-	obj_filename = PyUnicode_FromString(filename);
-	if (obj_filename == NULL) {
-		g_warning("failed to create unicode from '%s'", filename);
-		Py_DECREF(tmp_dict);
-		return -1;
-	}
-	obj_lineno = PyLong_FromLong(lineno);
-	if (obj_lineno == NULL) {
-		g_warning("failed to create long from '%d'", lineno);
-		Py_DECREF(tmp_dict);
-		Py_DECREF(obj_filename);
-		return -1;
-	}
-
-	switch(*type) {
-	case block:
-		block_to_match();
-		break;
-	case conf:
-		arrange_conf();
-		break;
-	case kw:
-		keyword = g_hash_table_lookup(entry, "keyword");
-		match = convert_kw_to_match(*keyword, entry);
-		break;
-	case addtask:
-		arrange_addtask();
-		break;
-	};
+#define GEN_AST_HANDLER(NAME) \
+void ast_##NAME(PyObject *args) { \
+	PyObject *func = NULL; \
+	PyObject *ret = NULL; \
+ \
+	func = g_hash_table_lookup(ast_method_table, "##NAME##"); \
+	if (func == NULL) { \
+		log_warn("failed to look up ast func '##NAME##'"); \
+		return; \
+	} \
+ \
+	ret = PyObject_CallObject(func, args); \
+	if (ret == NULL) { \
+		log_warn("failed to call ast '##NAME##'"); \
+	} \
+	return; \
 }
 
-#endif
 
-void ast_handle_method(PyObject *ast) {
+gint ast_import_method(PyObject *ast, const gchar *method_str) {
+	PyObject *method = NULL;
+	gboolean r = FALSE;
+
+	method = pyutils_get_method(ast, method_str);
+	if (method == NULL) {
+		log_err("failed to get method '%s'", method_str);
+		g_hash_table_unref(ast_method_table);
+		return -1;
+	}
+
+	r = g_hash_table_insert(ast_method_table,
+	                        g_strdup(method_str),
+	                        method);
+	if (r != TRUE) {
+		log_err("failed to insert method '%s' into hashtable",
+		          method_str);
+		Py_XDECREF(method);
+		g_hash_table_unref(ast_method_table);
+		return -1;
+	}
+
+	return 0;
+}
+
+gint ast_cb_init(PyObject *ast) {
+	gint r = -1;
+
+	ast_method_table = g_hash_table_new_full(g_str_hash,
+	                                         g_str_equal,
+	                                         g_free,
+	                                         (GDestroyNotify) Py_DecRef);
+	if (ast_method_table == NULL) {
+		log_err("failed to create ast method table");
+		return -1;
+	}
+
+	r = ast_import_method(ast, "handleMethod");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handlePythonMethod");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleExport");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleExportFuncs");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleAddTask");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleDelTask");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleBBHandlers");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleInherit");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleData");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleUnset");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleUnsetFlag");
+	if (r != 0) return r;
+	r = ast_import_method(ast, "handleInclude");
+
+	return r;
+}
+
+void ast_cb_free() {
+	g_hash_table_unref(ast_method_table);
+}
+
+GEN_AST_HANDLER(handleMethod)
+GEN_AST_HANDLER(handlePythonMethod)
+GEN_AST_HANDLER(handleExport)
+GEN_AST_HANDLER(handleExportFuncs)
+GEN_AST_HANDLER(handleAddTask)
+GEN_AST_HANDLER(handleDelTask)
+GEN_AST_HANDLER(handleBBHandlers)
+GEN_AST_HANDLER(handleInherit)
+GEN_AST_HANDLER(handleData)
+GEN_AST_HANDLER(handleUnset)
+GEN_AST_HANDLER(handleUnsetFlag)
+GEN_AST_HANDLER(handleInclude)
+#undef GEN_AST_HANDLER
+
+#if 0
+void ast_handle_method(PyObject *args) {
+	PyObject *func = NULL;
+	PyObject *ret = NULL;
+	const gchar *func_str = "handleMethod";
+
+	func = g_hash_table_lookup(ast_method_table, func_str);
+	if (func == NULL) {
+		log_warn("failed to look up ast func '%s'", func_str);
+		return;
+	}
+
+	ret = PyObject_CallObject(func, args);
+	if (ret == NULL) {
+		log_warn("failed to call ast '%s'", func_str);
+	}
 	//handleMethod(statements, filename, lineno, func_name, body, python, fakeroot):
 	//    statements.append(MethodNode(filename, lineno, func_name, body, python, fakeroot))
 	return;
@@ -146,4 +221,4 @@ void ast_handle_include(PyObject *ast,
 
 	return;
 }
-
+#endif

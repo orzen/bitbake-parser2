@@ -7,7 +7,7 @@ LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
 SRCS = $(BISON_GEN) $(LEX_GEN) \
-       convert.c pyobj_ast.c \
+       convert.c pyobj_ast.c pyobj_d.c pyobj_match.c python_utils.c \
        files.c main.c node.c parser_types.c utils.c
 
 PKGS = glib-2.0 python-3.7
@@ -20,7 +20,7 @@ LIBS += $(shell pkg-config --libs $(PKGS))
 
 GENERATED=$(BISON_GEN) $(LEX_GEN)
 
-all: $(LEX)
+all: $(LEX) python
 	gcc $(CFLAGS) $(SRCS) $(LIBS) -o $(PROG)
 
 $(LEX): $(LEX_SRC) $(BISON_GEN)
@@ -29,8 +29,15 @@ $(LEX): $(LEX_SRC) $(BISON_GEN)
 $(BISON_GEN): $(BISON_SRC)
 	bison --report=state -d $(BISON_SRC)
 
-$(SETUP_PY): $(LEX)
+python: $(LEX)
 	python3 setup.py build_ext
+
+install:
+	install $(shell find build/ -name "*.so") pytest/
+
+uninstall:
+	rm pytest/*.so
 
 clean:
 	rm $(GENERATED) $(PROG) parser.output
+	rm -rf build

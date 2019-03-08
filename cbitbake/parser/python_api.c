@@ -9,37 +9,37 @@
 #include "python_utils.h"
 
 #if 0
-__func_start_regexp__
-__inherit_regexp__
-__export_func_regexp__
-__addtask_regexp__
-__addhandler_regexp__
-__infunc__
-__body__
-__residue__
-__classname__
+	__func_start_regexp__
+	__inherit_regexp__
+	__export_func_regexp__
+	__addtask_regexp__
+	__addhandler_regexp__
+	__infunc__
+	__body__
+	__residue__
+	__classname__
 #endif
 
 static PyObject *PARSER_ERROR;
 
 #if 0
-static void foo(){
-	PyObject *path = PyImport_ImportModule("os.path");
-	//PyObject *path = PyObject_GetAttrString(os, "path");
-	//PyObject *fun_exists = PyObject_GetAttrString(path, "exists");
-	PyObject *os_res = PyObject_CallMethod(path, "exists", "s", "bogus.txt");
-	if (os_res == NULL) {
-		printf("failed to call exists\n");
+	static void foo(){
+		PyObject *path = PyImport_ImportModule("os.path");
+		//PyObject *path = PyObject_GetAttrString(os, "path");
+		//PyObject *fun_exists = PyObject_GetAttrString(path, "exists");
+		PyObject *os_res = PyObject_CallMethod(path, "exists", "s", "bogus.txt");
+		if (os_res == NULL) {
+			printf("failed to call exists\n");
+		}
+		//os_res = PyObject_CallFunction(fun_exists, "s", "bogus.txt");
+		if (os_res == NULL) {
+			printf("failed to call exists\n");
+		}
+		printf("bogus.txt exists? check '%d', val '%d'\n", PyBool_Check(os_res), os_res == Py_True);
+		os_res = PyObject_CallMethod(path, "exists", "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
+		//os_res = PyObject_CallFunction(fun_exists, "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
+		printf("cbbparser.cpython-37m-x86_64-linux-gnu.so exists? '%d'\n", os_res == Py_True);
 	}
-	//os_res = PyObject_CallFunction(fun_exists, "s", "bogus.txt");
-	if (os_res == NULL) {
-		printf("failed to call exists\n");
-	}
-	printf("bogus.txt exists? check '%d', val '%d'\n", PyBool_Check(os_res), os_res == Py_True);
-	os_res = PyObject_CallMethod(path, "exists", "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
-	//os_res = PyObject_CallFunction(fun_exists, "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
-	printf("cbbparser.cpython-37m-x86_64-linux-gnu.so exists? '%d'\n", os_res == Py_True);
-}
 #endif
 
 
@@ -61,8 +61,8 @@ static gint import_modules(GHashTable *modules, gint num, ...) {
 		}
 
 		if (!g_hash_table_insert(modules,
-		                         g_strdup(module_name),
-		                         module)) {
+					 g_strdup(module_name),
+					 module)) {
 			g_warning("failed to store module '%s' in hashtable", module_name);
 			r = -1;
 		}
@@ -99,42 +99,26 @@ gint handle_type_kw(GHashTable *entry) {
 }
 
 static void get_statements(const gchar *filename,
-                           const gchar *abs_filename,
-                           const gchar *basename) {
-	// TODO continue here
-	GList *parse_result;
+			   const gchar *abs_filename,
+			   const gchar *basename) {
+	GNode *parse_result;
+	gint r = -1;
+
+	//TODO add caching
 
 	parse_result = cbb_parse_file(abs_filename);
-
-	GList *iter;
-	for(iter = parse_result; g_list_next(iter) != NULL; iter = g_list_next(iter)) {
-		GHashTable *entry;
-		gchar *filename;
-		gint *lineno;
-		gchar *type;
-
-		entry = iter->data;
-		filename = g_hash_table_lookup(entry, "filename");
-		lineno = g_hash_table_lookup(entry, "lineno");
-		type = g_hash_table_lookup(entry, "type");
-
-		switch(type) {
-		case block:
-			handle_type_block(entry);
-			break;
-		case conf:
-			handle_type_conf(entry);
-			break;
-		case kw:
-			handle_type_kw(entry);
-			break;
-		case addtask:
-			handle_type_addtask(entry);
-			break;
-		}
-
-		printf("filename '%s', type '%s', lineno '%d'\n", filename, type, *lineno);
+	if (parse_result == NULL) {
+		log_error("invalid parse result");
 	}
+
+	//TODO move init and free
+	ast_cb_init(ast);
+
+	r = convert_ast_to_python(parse_result, NULL, filename);
+
+	//TODO continue here
+
+	ast_cb_free();
 }
 
 static PyObject* api_handle(PyObject *self, PyObject *args) {
@@ -143,7 +127,7 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 	gchar *basename = NULL;
 	gchar *abs_path = NULL;
 	gchar **split = NULL;
-	PyObject *user_data = NULL;
+	PyObject *ast = NULL;
 	PyObject *d = NULL;
 	PyObject *oldfile = NULL;
 	gint include = -1;
@@ -154,10 +138,10 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 		return NULL;
 	}
 
-	// TODO is it necessary to have global variables? if used by upwards by
-	// ast.py then maybe, otherwise use a GHashtable downwards
+		// TODO is it necessary to have global variables? if used by upwards by
+		// ast.py then maybe, otherwise use a GHashtable downwards
 
-	r = PyArg_ParseTuple(args, "OsOi", &user_data, &filename, &d, &include);
+	r = PyArg_ParseTuple(args, "OsOi", &ast, &filename, &d, &include);
 	if (r == 0) {
 		g_warning("failed to parse args");
 		return NULL;
@@ -174,9 +158,9 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 	}
 
 	modules = g_hash_table_new_full(g_str_hash,
-	                                g_str_equal,
-	                                g_free,
-	                                (GDestroyNotify) Py_DecRef);
+					g_str_equal,
+					g_free,
+					(GDestroyNotify) Py_DecRef);
 
 	r = import_modules(modules, 1, "bb.parse");
 
@@ -231,21 +215,11 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 	abs_path = PyBytes_AsString(abs_fn);
 	get_statements(filename, abs_path, basename);
 
-	//cbb_print_pyobj("abs.txt", abs_fn);
 
 
 	//TODO this is and intensional error
 	return oldfile;
-
 }
-
-#if 0
-static PyObject* inherit_node() {
-	PyObject *dict = NULL;
-
-	dict = PyDict_New();
-}
-#endif
 
 static PyMethodDef cbb_parser_methods[] = {
 	{"handle",  api_handle, METH_VARARGS, "Parsing a given file and returning AstNodes for ast.py"},

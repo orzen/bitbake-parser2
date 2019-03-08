@@ -2,6 +2,7 @@
 #include <Python.h>
 #include <unistd.h>
 
+#include "log.h"
 #include "pyobj_d.h"
 
 void cbb_print_pyobj(const gchar *filename, PyObject *o) {
@@ -31,6 +32,23 @@ void cbb_init(PyObject *d) {
 
 		cbb_d_set_var(d, "TOPDIR", cwd);
 	}
+}
+
+PyObject* pyutils_get_method(PyObject *module, const gchar *method_str) {
+	PyObject *method = NULL;
+
+	if (module == NULL || method_str == NULL) {
+		log_warn("empty args");
+		return NULL;
+	}
+
+	method = PyObject_GetAttrString(module, method_str);
+	if (method == NULL) {
+		g_warning("failed to get method '%s'", method_str);
+		return NULL;
+	}
+
+	return method;
 }
 
 PyObject* get_method_from_module(const gchar *module_str, const gchar *method_str) {
@@ -79,13 +97,11 @@ gchar* cbb_resolve_file(const gchar *filename, PyObject *d) {
 	PyObject *method = NULL;
 	PyObject *args = NULL;
 	PyObject *keywords = NULL;
-	PyObject *bb_utils = NULL;
 	PyObject *res = NULL;
-	PyObject *new_filename = NULL;
+	PyObject *new_filename_obj = NULL;
 	PyObject *attempts = NULL;
-	PyObject *af = NULL;
 	Py_ssize_t size = 0;
-	gint i = 0;
+	gchar *new_filename_str = NULL;
 	gint r = -1;
 
 	if (filename == NULL || d == NULL) {
@@ -95,11 +111,6 @@ gchar* cbb_resolve_file(const gchar *filename, PyObject *d) {
 
 	if (!g_path_is_absolute(filename)) {
 		bbpath = cbb_d_get_var(d, "BBPATH", 1);
-		// TODO seems like the rest is unecessary if bbpath is None
-		//if (bbpath == Py_None) {
-		//	g_warning("failed to get BBPATH");
-		//	return NULL;
-		//}
 
 		method = get_method_from_module("bb.utils", "which");
 		if (method == NULL) {
@@ -152,8 +163,8 @@ gchar* cbb_resolve_file(const gchar *filename, PyObject *d) {
 			return NULL;
 		}
 
-		new_filename = PyTuple_GetItem(res, 0);
-		if (new_filename == NULL) {
+		new_filename_obj = PyTuple_GetItem(res, 0);
+		if (new_filename_obj == NULL) {
 			g_warning("failed to get new_filename from tuple");
 			Py_DECREF(res);
 			return NULL;
@@ -163,22 +174,14 @@ gchar* cbb_resolve_file(const gchar *filename, PyObject *d) {
 		if (attempts == NULL) {
 			g_warning("failed to get attempts from tuple");
 			Py_DECREF(res);
-			Py_DECREF(new_filename);
+			Py_DECREF(new_filename_obj);
 			return NULL;
 		}
 		Py_DECREF(res);
-#if 0
-		size = PyList_Size(attempts);
-		for (i = 0; i < size; i++) {
-			af = PyList_GetItem(attempts, i);
-			if (af == NULL) {
-				g_warning("failed to get value from attempts");
-				Py_DECREF(new_filename);
-				Py_DECREF(attempts);
-			}
-		}
-#endif
 	}
 
-	return filename;
+	new_filename_str = PyBytes_AsString(new_filename_obj);
+	Py_DECREF(new_filename_obj);
+
+	return new_filename_str;
 }
