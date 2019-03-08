@@ -3,6 +3,7 @@
 #include <strings.h>
 #include <stdio.h>
 
+#include "bbcompat.h"
 #include "files.h"
 #include "lexer.h"
 #include "pyobj_d.h"

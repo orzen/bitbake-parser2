@@ -6,9 +6,12 @@ BISON_GEN = parser.tab.c parser.tab.h
 LEX_SRC = lexer.l
 LEX_GEN = lex.yy.c
 
+#SRCS = $(BISON_GEN) $(LEX_GEN) \
+#       convert.c pyobj_ast.c pyobj_d.c pyobj_match.c python_utils.c \
+#       files.c main.c node.c parser_types.c utils.c
+
 SRCS = $(BISON_GEN) $(LEX_GEN) \
-       convert.c pyobj_ast.c pyobj_d.c pyobj_match.c python_utils.c \
-       files.c main.c node.c parser_types.c utils.c
+       $(wildcard *.c)
 
 PKGS = glib-2.0 python-3.7
 

@@ -301,7 +301,7 @@ static GList* ast_finalize_request(PyObject *args, GNode *entry, enum node_type 
 	return ret;
 }
 
-static GList* construct_ast_request(GNode *entry,
+static GList* form_astbb_invokation(GNode *entry,
                                     PyObject *statements,
                                     gchar *filename) {
 	struct node_int *internal = NULL;
@@ -330,9 +330,9 @@ static GList* construct_ast_request(GNode *entry,
 	return ast_finalize_request(args, entry, type, filename);
 }
 
-gint convert_ast_to_python(PyObject *statements,
-                           GNode *root,
-                           gchar *filename) {
+gint convert_ast_to_bbast(PyObject *statements,
+                          GNode *root,
+                          gchar *filename) {
 	GNode *child = NULL;
 	GList *func_and_args = NULL;
 	AstHandleFunc ast_handler = NULL;
@@ -346,7 +346,7 @@ gint convert_ast_to_python(PyObject *statements,
 	for (child = root->children;
 	     child != NULL;
 	     child = g_node_next_sibling(child)) {
-		func_and_args = construct_ast_request(child,
+		func_and_args = form_astbb_invokation(child,
 		                                      statements,
 		                                      filename);
 		if (func_and_args == NULL) {
