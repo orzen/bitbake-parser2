@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <glib.h>
 #include <Python.h>
 
@@ -14,14 +13,4 @@ void log_pyerr(PyObject *error, const gchar *format, ...) {
 	PyErr_SetString(error, str);
 
 	g_free(str);
-}
-
-void _lex_err(const gchar *format, ...) {
-	va_list ap;
-
-	va_start(ap, format);
-	vfprintf(stderr, format, ap);
-	va_end(ap);
-
-	exit(1);
 }

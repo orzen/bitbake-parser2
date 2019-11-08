@@ -1,8 +1,8 @@
 #include <glib.h>
 #include <stdio.h>
 
-#include "bbcompat.h"
-#include "parser_types.h"
+#include "convert.h"
+#include "types.h"
 #include "pyobj_ast.h"
 
 struct type_info {

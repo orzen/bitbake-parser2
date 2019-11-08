@@ -1,7 +1,7 @@
 #include <glib.h>
 #include <Python.h>
 
-#include "log.h"
+#include "pylog.h"
 
 gchar* bb_parse_resolve_file(GHashTable *modules, PyObject *error, const gchar *filename, PyObject *d) {
 	PyObject *mod_bb_parse = NULL;

@@ -1,10 +1,6 @@
 #ifndef _PARSER_TYPES_H_
 #define _PARSER_TYPES_H_
 
-#include <glib.h>
-
-#include "pyobj_ast.h"
-
 enum node_type {
 	root = 0,
 	conf,
@@ -48,10 +44,5 @@ enum quote_type {
 	single_quote = 0,
 	double_quote
 };
-
-AstHandleFunc types_get_ast_callback(enum node_type type);
-gint types_get_ast_num_args(enum node_type type);
-const gchar* types_itoa(enum node_type type);
-const gchar* types_op_itoa(enum op_type op);
 
 #endif

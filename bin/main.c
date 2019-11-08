@@ -1,7 +1,6 @@
 #include <glib.h>
 #include <stdio.h>
 
-#include "convert.h"
 #include "lexer.h"
 #include "node.h"
 
@@ -13,6 +12,5 @@ gint main(gint argc, gchar **argv) {
 		printf("arg[%d]: '%s'\n", i, argv[i]);
 		root = cbb_parse_file(argv[i]);
 		//node_print_tree(root);
-		convert_ast_to_python(root);
 	}
 }

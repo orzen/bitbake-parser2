@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <glib.h>
 
+#include "log.h"
 #include "node.h"
 #include "parser_types.h"
 
@@ -149,7 +150,7 @@ gboolean node_debug_traverse_func(GNode *node, gpointer data) {
 	for (i = 0; i < depth; i++) {
 		printf("_");
 	}
-	printf("%s:%d\n", types_itoa(internal->type), internal->lineno);
+	log_dbg("%d:%d", internal->type, internal->lineno);
 
 	return FALSE;
 }

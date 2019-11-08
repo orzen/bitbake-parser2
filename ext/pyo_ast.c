@@ -2,7 +2,7 @@
 #include <Python.h>
 
 #include "log.h"
-#include "pyobj_ast.h"
+#include "pyo_ast.h"
 #include "python_utils.h"
 
 static GHashTable *ast_method_table;
