@@ -1,0 +1,10 @@
+General
+=======
+- Check cython and pypi for ideas and performance comparison
+
+
+- use GNode instead of GList and GHashTable to represent the parse tree
+- Read up on how to use yyextra to store user data
+- You may find that '%option header-file' is particularly useful for
+generating prototypes of all the accessor functions.  *Note
+option-header
