@@ -1,16 +1,18 @@
 #include <glib.h>
-#include <Python.h>
 #include <strings.h>
 #include <stdio.h>
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
 
 #include "bbcompat.h"
 #include "files.h"
 #include "lexer.h"
 #include "log.h"
-#include "pyobj_ast.h"
-#include "pyobj_d.h"
+#include "pyo_ast2.h"
+#include "pyo_d.h"
 #include "pyo_bb_parse.h"
 #include "python_utils.h"
+#include "node.h"
 
 #if 0
 	__func_start_regexp__
@@ -24,219 +26,250 @@
 	__classname__
 #endif
 
-static PyObject *PARSER_ERROR;
+struct state {
+	GList *body;
+	GList *infunc;
+	gchar *class_name;
+	GList *residue;
+	PyObject *err; // Module exception
+	PyObject *mod_bb_parse;
+	struct ast *ast;
+	PyObject *obj_d;
+	PyObject *cls_statementgroup;
+	PyObject *cached_statements;
+};
 
-#if 0
-	static void foo(){
-		PyObject *path = PyImport_ImportModule("os.path");
-		//PyObject *path = PyObject_GetAttrString(os, "path");
-		//PyObject *fun_exists = PyObject_GetAttrString(path, "exists");
-		PyObject *os_res = PyObject_CallMethod(path, "exists", "s", "bogus.txt");
-		if (os_res == NULL) {
-			printf("failed to call exists\n");
-		}
-		//os_res = PyObject_CallFunction(fun_exists, "s", "bogus.txt");
-		if (os_res == NULL) {
-			printf("failed to call exists\n");
-		}
-		printf("bogus.txt exists? check '%d', val '%d'\n", PyBool_Check(os_res), os_res == Py_True);
-		os_res = PyObject_CallMethod(path, "exists", "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
-		//os_res = PyObject_CallFunction(fun_exists, "s", "cbbparser.cpython-37m-x86_64-linux-gnu.so");
-		printf("cbbparser.cpython-37m-x86_64-linux-gnu.so exists? '%d'\n", os_res == Py_True);
-	}
-#endif
+static struct state *S;
 
-
-static gint import_modules(GHashTable *modules, gint num, ...) {
-	va_list ap;
-	PyObject *module = NULL;
-	gchar *module_name = NULL;
-	gint r = 0;
-	gint i = 0;
-
-	va_start(ap, 0);
-	for (i = 0; i < num; i++) {
-		module_name = va_arg(ap, char*);
-
-		module = PyImport_ImportModule(module_name);
-		if (module == NULL) {
-			g_warning("failed to import module '%s'", module_name);
-			r = -1;
-		}
-
-		if (!g_hash_table_insert(modules,
-					 g_strdup(module_name),
-					 module)) {
-			g_warning("failed to store module '%s' in hashtable", module_name);
-			r = -1;
-		}
-	}
-	va_end(ap);
-
-	return r;
-}
-
-//gint handle_resolve_kw_callback(enum kw_type kw_t, void **callback) {
-//	gint force = 0;
-//}
-
-#if 0
-gint handle_type_kw(GHashTable *entry) {
-	gint *keyword = NULL;
-
-	if (entry == NULL) {
-		g_warning("empty arguments");
-		return -1;
-	}
-
-	keyword = g_hash_table_lookup(entry, "keyword");
-	if (keyword == NULL) {
-		g_warning("failed to resolve keyword");
-		return -1;
-	}
-
-	convert_kw_to_match(*keyword, entry);
-
-
-	ast_handle_
-
-	return 0;
-}
-#endif
-
-static void get_statements(
-			const gchar *filename,
-			   const gchar *abs_filename,
-			   const gchar *basename) {
+static PyObject* get_statements(const gchar *filename,
+                           const gchar *abs_filename,
+                           const gchar *basename) {
 	GNode *parse_result;
+	PyObject *statements;
 	gint r = -1;
 
-	//TODO add caching
+	log_dbg("filename '%s', abs_filename '%s', basename '%s'",
+	        filename, abs_filename, basename);
 
-	parse_result = cbb_parse_file(abs_filename);
-	if (parse_result == NULL) {
-		log_err("invalid parse result");
+	statements = PyDict_GetItemString(S->cached_statements, abs_filename);
+	if (statements) {
+		return statements;
 	}
 
-	r = bbcompat_call_bbast(parse_result, NULL, filename);
+	statements = ast_statementgroup_new(S->cls_statementgroup);
+	if (!statements) {
+		log_err("failed to create new statements");
+	}
 
-	//TODO continue here
+	parse_result = parse_file(abs_filename);
+	if (!parse_result) {
+		log_err("invalid parse result");
+	}
+	node_print_tree(parse_result);
 
+	r = compat_call_bbast(S->ast, parse_result, statements, filename);
+
+	// If the file is a bbclass or inc, cache the statements
+	if (g_str_has_suffix(filename, ".bbclass") ||
+	    g_str_has_suffix(filename, ".inc")) {
+		r = PyDict_SetItemString(S->cached_statements,
+		                         abs_filename,
+		                         statements);
+		if (r == -1) {
+			log_err("failed to cache statements for '%s'",
+			        abs_filename);
+		}
+	}
+
+	return statements;
 }
 
 static PyObject* api_handle(PyObject *self, PyObject *args) {
-	GHashTable *modules;
 	gchar *filename = NULL;
 	gchar *basename = NULL;
 	gchar *abs_path = NULL;
 	gchar **split = NULL;
-	PyObject *ast = NULL;
 	PyObject *d = NULL;
 	PyObject *oldfile = NULL;
 	gint include = -1;
 	gint r = -1;
 
 	if (self == NULL || args == NULL) {
-		g_warning("Either self or args is NULL");
-		return NULL;
+		log_warn("Either self or args is NULL");
+		Py_RETURN_NONE;
 	}
 
-		// TODO is it necessary to have global variables? if used by upwards by
-		// ast.py then maybe, otherwise use a GHashtable downwards
-
-	r = PyArg_ParseTuple(args, "OsOi", &ast, &filename, &d, &include);
+	r = PyArg_ParseTuple(args, "sOi", &filename, &d, &include);
 	if (r == 0) {
-		g_warning("failed to parse args");
-		return NULL;
+		log_warn("failed to parse args");
+		Py_RETURN_NONE;
 	}
-
-	//if (!PyDict_Check(user_data)) {
-	//	g_warning("user_data is not a dict");
-	//	return NULL;
-	//}
 
 	if (filename == NULL) {
-		g_warning("empty filename");
-		return NULL;
+		log_warn("empty filename");
+		Py_RETURN_NONE;
 	}
 
-	modules = g_hash_table_new_full(g_str_hash,
-					g_str_equal,
-					g_free,
-					(GDestroyNotify) Py_DecRef);
-
-	r = import_modules(modules, 1, "bb.parse");
-
-	cbb_init(d);
+	pyo_d_init(d);
 
 	basename = g_path_get_basename(filename);
 	/*
 	 * split is an array, index 0 is the filename and index 1 is the file
 	 * extension.
 	 */
-	split = cbb_split_extension(basename);
+	split = g_strsplit(basename, ".", -1);
 	if (split == NULL) {
+		log_warn("failed to determine basename");
 		g_free(basename);
-		return NULL;
+		Py_RETURN_NONE;
 	}
 	g_free(basename);
 
 	if (!g_strcmp0(".bbclass", split[1])) {
 		//TODO Is this necessary in BBHandler.py?
-		g_debug("extension is .bbclass");
+		log_warn("extension is .bbclass");
+		Py_RETURN_NONE;
 	}
+	g_strfreev(split);
 
 	if (include) {
-		oldfile = cbb_d_get_var(d, "FILE", 0);
+		oldfile = pyo_d_get_var(d, "FILE", 0);
 		if (oldfile == NULL) {
-			g_warning("oldfile is null");
-			return NULL;
+			log_warn("oldfile is null");
+			Py_RETURN_NONE;
 		}
 	}
 
-	abs_path = bb_parse_resolve_file(modules, PARSER_ERROR, filename, d);
-	get_statements(filename, abs_path, basename);
+	abs_path = bb_parse_resolve_file(S->mod_bb_parse, S->err, filename, d);
+	if (!abs_path) {
+		log_warn("failed to resolve file");
+		Py_RETURN_NONE;
+	}
 
-	ast_cb_init(ast);
-	ast_cb_free();
+	get_statements(filename, abs_path, basename);
 
 	g_free(abs_path);
 
-
-	//TODO this is and intensional error
-	return oldfile;
+	return Py_BuildValue("");
 }
 
+// TODO these are dependencies that needs to be implemented
 //bb.parse.BBHandler.cached_statements = {}
 //bb.parse.BBHandler.inherit
 //bb.parse.ConfHandler.include
 
-static PyMethodDef cbb_parser_methods[] = {
+static PyMethodDef bbcparser_methods[] = {
 	{"handle",  api_handle, METH_VARARGS, "Parsing a given file and returning AstNodes for ast.py"},
 	{NULL, NULL, 0, NULL} /* Sentinel */
 };
 
-static struct PyModuleDef cbb_parser_module = {
-	PyModuleDef_HEAD_INIT,
-	"cparse",   /* name of module */
-	"A C implementation of bitbake's parse.BBHandler", /* module documentation, may be NULL */
-	-1,       /* size of per-interpreter state of the module,
-	             or -1 if the module keeps state in global variables. */
-	cbb_parser_methods
-};
+void state_free() {
+	if (S) {
+		if (S->ast) {
+			ast_free(S->ast);
+		}
 
-PyMODINIT_FUNC PyInit_cbbparser() {
-	PyObject *m = NULL;
+		if (S->mod_bb_parse) {
+			Py_DECREF(S->mod_bb_parse);
+		}
 
-	m = PyModule_Create(&cbb_parser_module);
-	if (m == NULL) {
-		return NULL;
+		if (S->cls_statementgroup) {
+			Py_DECREF(S->cls_statementgroup);
+		}
+
+		if (S->cached_statements) {
+			Py_DECREF(S->cached_statements);
+		}
+
+		if (S->err) {
+			Py_DECREF(S->err);
+		}
+
+		Py_DECREF(S->err);
+		g_free(S);
+	}
+}
+
+void module_free() {
+	state_free();
+}
+
+void state_new() {
+	S = g_new0(struct state, 1);
+	if (S == NULL) {
+		log_warn("failed to allocate state");
+		goto error;
 	}
 
-	PARSER_ERROR = PyErr_NewException("cbb_parser.error", NULL, NULL);
-	Py_INCREF(PARSER_ERROR);
+	G_DEBUG_HERE();
 
-	PyModule_AddObject(m, "error", PARSER_ERROR);
+	S->err = PyErr_NewException("bb_cparser.error", NULL, NULL);
+	Py_INCREF(S->err);
+
+	S->ast = ast_new();
+	if (S->ast == NULL) {
+		log_warn("failed to import bb.parse.ast");
+		goto error;
+	}
+
+	// Import bb.parse
+	S->mod_bb_parse = PyImport_ImportModule("bb.parse");
+	if (S->mod_bb_parse == NULL) {
+		log_warn("failed to import bb.parse");
+		goto error;
+	}
+
+	S->cls_statementgroup = ast_import_statementgroup(S->ast->mod);
+	if (S->cls_statementgroup == NULL) {
+		log_warn("failed to import StatementGroup");
+		goto error;
+	}
+
+	S->cached_statements = PyDict_New();
+	if (S->cached_statements == NULL) {
+		log_warn("failed to create statements dict");
+		goto error;
+	}
+
+	return;
+error:
+	ast_free(S->ast);
+	state_free();
+}
+
+static struct PyModuleDef bbcparser_module = {
+	PyModuleDef_HEAD_INIT,
+	.m_name = "bbcparser",   /* name of module */
+	.m_doc = "A C implementation of bitbake's parse.BBHandler", /* module documentation, may be NULL */
+	.m_size = -1, /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+	.m_methods = bbcparser_methods
+};
+//	.m_slots = NULL,
+//	.m_traverse = NULL,
+//	.m_clear = NULL,
+//	.m_free = module_free
+
+PyMODINIT_FUNC PyInit_bbcparser() {
+	PyObject *m = NULL;
+
+	m = PyModule_Create(&bbcparser_module);
+	if (m == NULL) {
+		log_warn("failed to create module");
+		goto out;
+	}
+
+	state_new();
+
+	PyModule_AddObject(m, "error", S->err);
 
 	return m;
+
+out:
+	log_warn("bbcparser out");
+
+	//if (m) {
+	//	Py_DECREF(m);
+	//}
+
+	return NULL;
 }

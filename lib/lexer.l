@@ -184,17 +184,24 @@ void yyerror(yyscan_t yyscanner, GNode **acc, const gchar *error_str) {
 	exit(-1);
 }
 
-GNode* cbb_parse_file(const gchar *fn) {
+GNode* parse_file(const gchar *fn) {
 	yyscan_t scanner;
 	GNode *acc = NULL;
 	FILE *file = NULL;
 	int r = -1;
 
-	r = cbb_open_file(fn, &file);
-	if (r < 0) {
-		log_err("Failed to open file!");
+	if (fn == NULL) {
+		log_err("Empty filename");
+		goto out;
 	}
 
+	r = files_open_file(fn, &file);
+	if (r < 0) {
+		log_err("Failed to open file '%s'!", fn);
+		goto out;
+	}
+
+	// filename is global
 	g_free(filename);
 	filename = g_strdup(fn);
 	if (filename == NULL) {
@@ -223,4 +230,15 @@ GNode* cbb_parse_file(const gchar *fn) {
 	}
 
 	return acc;
+
+out:
+	if (file) {
+		fclose(file);
+	}
+
+	if (filename) {
+		g_free(filename);
+	}
+
+	return NULL;
 }

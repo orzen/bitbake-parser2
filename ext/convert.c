@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 #include "convert.h"
-#include "types.h"
-#include "pyobj_ast.h"
+#include "parser_types.h"
+#include "pyo_ast.h"
 
 struct type_info {
 	const gchar *name;

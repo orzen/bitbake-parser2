@@ -55,4 +55,4 @@ def handleUnsetFlag(statements, filename, lineno, m):
 def handleExport(statements, filename, lineno, m):
     pass
 
-def parse(filename):
+#def parse(filename):

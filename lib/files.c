@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-gchar** cbb_split_extension(const gchar *filename) {
+gchar** files_split_extension(const gchar *filename) {
 	gchar **result = NULL;
 	gchar *tmp = NULL;
 	gchar *delimiter = NULL;
@@ -51,7 +51,7 @@ gchar** cbb_split_extension(const gchar *filename) {
 	return result;
 }
 
-int cbb_is_regular_file(const char *file_path) {
+int files_is_regular_file(const char *file_path) {
 	int r = -1;
 	struct stat stat_r;
 
@@ -71,11 +71,11 @@ int cbb_is_regular_file(const char *file_path) {
 	return 0;
 }
 
-int cbb_open_file(const char *file_path, FILE **fd) {
+int files_open_file(const char *file_path, FILE **fd) {
 	FILE *file = NULL;
 	int r = -1;
 
-	r = cbb_is_regular_file(file_path);
+	r = files_is_regular_file(file_path);
 	if (r < 0) {
 		return -1;
 	}

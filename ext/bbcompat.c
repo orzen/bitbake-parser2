@@ -2,342 +2,222 @@
 #include <Python.h>
 #include <stdarg.h>
 
+#include "convert.h"
 #include "log.h"
 #include "node.h"
 #include "parser_types.h"
-#include "pyobj_ast.h"
-#include "pyobj_match.h"
+#include "pyo_ast2.h"
+#include "pyo_match.h"
 #include "string.h"
 
-static gint convert_handle_apo(PyObject *dict, const gchar *str) {
-	PyObject *apo = NULL;
-	gint r = -1;
-
-	if (dict == NULL || str == NULL) {
-		log_warn("empty args");
-		return -1;
+#define STEP_ASSIGN(NODE, CHILD, VAR) \
+	if ((CHILD = g_node_next_sibling(CHILD)) != NULL) { \
+		VAR = CHILD->data; \
 	}
 
-	apo = PyUnicode_FromFormat("c", str[0]);
-	if (apo == NULL) {
-		log_warn("failed to create object for apo");
-		return -1;
+#define DICT_SET_OR_LOG(NAME) \
+	if (PyDict_SetItemString(groupd, "##NAME##", child->data) != 0) { \
+		log_warn("failed to add '##NAME##' to groupd"); \
 	}
-
-	r = PyDict_SetItemString(dict, "apo", apo);
-	if (r != 0) {
-		log_warn("failed to add apo to dict");
-		return -1;
-	}
-
-	return 0;
-}
-
-static gint convert_child_to_pydict(PyObject *dict,
-                                    GNode *node,
-                                    AstHandleFunc ast_override) {
-	GNode *child = NULL;
-	struct node_int *internal = NULL;
-	gint r = -1;
-	const gchar *key = NULL;
-	PyObject *value = NULL;
-
-	if (node == NULL) {
-		log_warn("failed to traverse children, empty node");
-		return -1;
-	}
-
-	for (child = node->children;
-	     child != NULL;
-	     child = g_node_next_sibling(child)) {
-		internal = child->data;
-
-		switch(internal->type) {
-		case body:
-			key = "value";
-			r = convert_handle_apo(dict, internal->data);
-			if (r != 0) {
-				return -1;
-			}
-			break;
-		case exp_var:
-			key = "exp";
-			value = Py_True;
-			break;
-		default:
-			key = types_itoa(internal->type);
-		}
-
-		if (value != NULL) {
-			value = PyUnicode_FromString(internal->data);
-		}
-
-		r = PyDict_SetItemString(dict, key, value);
-		if (r != 0) {
-			log_warn("failed to add key '%s' to dict", key);
-			return -1;
-		}
-
-		key = NULL;
-		Py_DECREF(value);
-		value = NULL;
-	}
-
-	return 0;
-}
-
-static gint convert_child_to_pylist(PyObject *list,
-                                    GNode *node,
-                                    AstHandleFunc ast_override) {
-	GNode *child = NULL;
-	struct node_int *internal = NULL;
-	gint r = -1;
-
-	if (node == NULL) {
-		log_warn("failed to traverse children, empty node");
-		return -1;
-	}
-
-	for (child = node->children;
-	     child != NULL;
-	     child = g_node_next_sibling(child)) {
-		PyObject *value = NULL;
-		internal = child->data;
-
-		value = PyBytes_FromString(internal->data);
-
-		r = PyList_Append(list, value);
-		if (r != 0) {
-			log_warn("failed to append item to list");
-			return -1;
-		}
-
-		Py_DECREF(value);
-	}
-
-	return 0;
-}
-
-static gint convert_child_to_tuple(PyObject *tuple,
-                                   GNode *node,
-                                   AstHandleFunc ast_override) {
-	GNode *child = NULL;
-	struct node_int *internal = NULL;
-	gint i = 3;
-	gint r = -1;
-
-	if (tuple == NULL || node == NULL) {
-		log_warn("empty args");
-		return -1;
-	}
-
-	if (ast_override != NULL) {
-		log_warn("override already set");
-		return -1;
-	}
-
-	for (child = node->children;
-	     child != NULL;
-	     child = g_node_next_sibling(child)) {
-		PyObject *value = NULL;
-		internal = child->data;
-
-		switch(internal->type) {
-		case python:
-			ast_override = &ast_handlePythonMethod;
-		case fakeroot:
-			value = Py_True;
-			break;
-		default:
-			value = PyBytes_FromString(internal->data);
-		}
-
-		r = PyTuple_SetItem(tuple, i, value);
-		if (r != 0) {
-			log_warn("failed to add item to tuple");
-			return -1;
-		}
-
-		i++;
-	}
-
-	return 0;
-}
-
-static gint ast_request_add_generic(PyObject *args,
-                                    PyObject *statements,
-                                    const gchar *filename,
-                                    gint lineno) {
-	gint r = -1;
-
-	if (args == NULL || statements == NULL || filename == NULL) {
-		log_warn("empty args");
-		return -1;
-	}
-
-	r = PyTuple_SetItem(args, 0, statements);
-	if (r != 0) {
-		log_warn("failed to add statements to ast args");
-		return -1;
-	}
-	r = PyTuple_SetItem(args, 1, PyBytes_FromString(filename));
-	if (r != 0) {
-		log_warn("failed to add statements to ast args");
-		return -1;
-	}
-	r = PyTuple_SetItem(args, 2, PyLong_FromLong(lineno));
-	if (r != 0) {
-		log_warn("failed to add statements to ast args");
-		return -1;
-	}
-
-	return 0;
-}
 
 /*
- * Returns a GList with two elements, callback function and callback args, on
- * success, otherwise returns NULL.
+ * This is 
+ * Export
+ * Unset
+ * BBHandlers
+ * Inherit
  */
-static GList* ast_finalize_request(PyObject *args,
-                                   GNode *entry,
-                                   enum node_type type,
-                                   const gchar *filename) {
-	PyObject *data = NULL;
+static void compat_handle_common(struct ast *ast,
+                                 GNode *node,
+                                 PyObject *statements,
+                                 const gchar *filename) {
+	GNode *child = NULL;
+	struct node_int *n = NULL;
+	PyObject *list = NULL;
 	PyObject *match = NULL;
-	gint r = -1;
-	GList *ret = NULL;
-	AstHandleFunc ast_func = NULL;
+	AstHandleFunc func = NULL;
 
-	switch (type) {
-	case conf:
-		data = PyDict_New();
-		gint *op = NULL;
+	G_DEBUG_HERE();
 
-		op = entry->data;
-
-		r = PyDict_SetItemString(data, types_op_itoa(*op), Py_True);
-		if (r != 0) {
-			log_warn("failed to add op to PyDict");
-			return NULL;
-		}
-
-		r = convert_child_to_pydict(data, entry, ast_func);
-		break;
-	case addtask:
-		data = PyDict_New();
-
-		r = PyDict_SetItemString(data, "func", entry->data);
-		if (r != 0) {
-			log_warn("failed to add addtask to PyDict");
-			return NULL;
-		}
-
-		r = convert_child_to_pydict(data, entry, ast_func);
-		break;
-	case deltask:
-		data = PyDict_New();
-		r = convert_child_to_pydict(data, entry, ast_func);
-		break;
-	case func:
-		r = convert_child_to_tuple(args, entry, ast_func);
-		data = args;
-		break;
-	default:
-		data = PyList_New(0);
-		r = convert_child_to_pylist(data, entry, ast_func);
+	if (!ast || !node || !statements || !filename) {
+		log_warn("invalid arguments");
+		goto error;
 	}
 
-	if (r != 0) {
-		log_warn("failed to convert child node to args");
-		return NULL;
+	n = node->data;
+
+	list = PyList_New(2);
+	if (!list) {
+		log_warn("failed to create list");
+		return;
 	}
 
-	if (PyList_CheckExact(data) == 1) {
-		match = Match_new_int(NULL, data);
-	} else if (PyDict_CheckExact(data) == 1) {
-		match = Match_new_int(data, NULL);
+	if (PyList_SetItem(list, 1, PyUnicode_FromString(n->data)) != 0) {
+		log_warn("failed to set list item to common data");
+		goto error;
 	}
 
-	if (type == conf) {
-		r = PyTuple_SetItem(args, 3, data);
-		if (r != 0) {
-			log_warn("failed to add data object to args");
-			return NULL;
-		}
-	} else {
-		r = PyTuple_SetItem(args, 3, match);
-		if (r != 0) {
-			log_warn("failed to add match object to args");
-			return NULL;
-		}
+	match = Match_new_int(NULL, list);
+	if (!match) {
+		log_warn("failed to create match object");
+		goto error;
 	}
 
-	if (type == export_funcs) {
-		gchar *pos = NULL;
+	func = types_get_ast_callback(n->type);
+	func(ast, statements, filename, n->lineno, match);
 
-		// Removing the bbclass file suffix
-		pos = strrchr(filename, '.');
-		if (pos == NULL) {
-			log_warn("classname does not contain a '.'");
-			return NULL;
-		}
-
-		// NOTE: This is not thread safe since it's working directly on
-		// a shared string instead of a copy.
-		*pos = '\0';
-
-		r = PyTuple_SetItem(args, 4, PyUnicode_FromString(filename));
-		*pos = '.';
-		if (r != 0) {
-			log_warn("failed to add match object to args");
-			return NULL;
-		}
+	return;
+error:
+	if (list) {
+		Py_DECREF(list);
 	}
-
-	if (ast_func == NULL) {
-		ast_func = types_get_ast_callback(type);
-	}
-
-	ret = g_list_append(NULL, ast_func);
-	ret = g_list_append(ret, data);
-
-	return ret;
 }
 
-static GList* form_bbast_callbacks(GNode *entry,
-                                   PyObject *statements,
-                                   gchar *filename) {
-	struct node_int *internal = NULL;
-	PyObject *args = NULL;
-	gint type = -1;
-	gint num_args = 0;
+static void compat_handle_data(struct ast *ast,
+                               GNode *node,
+                               PyObject *statements,
+                               const gchar *filename) {
+	GNode *child = NULL;
+	struct node_int *n = NULL;
+	PyObject *groupd = NULL;
+	gint *data = NULL;
+	gint lineno = -1;
 	gint r = -1;
+
+	G_DEBUG_HERE();
+
+	if (!ast || !node || !statements || !filename) {
+		log_warn("invalid arguments");
+		goto error;
+	}
+
+	G_DEBUG_HERE();
+
+	n = node->data;
+	lineno = n->lineno;
+	data = n->data;
+
+	groupd = PyDict_New();
+	if (!groupd) {
+		log_warn("failed to allocate PyDict");
+		goto error;
+	}
+
+	r = PyDict_SetItemString(groupd, types_op_itoa(*data), Py_True);
+	if (r != 0) {
+		log_warn("failed to add assign operator to groupd");
+		goto error;
+	}
+
+	for (child = node->children;
+	     child != NULL;
+	     child = g_node_next_sibling(child)) {
+		n = child->data;
+		switch (n->type) {
+			case var:
+				DICT_SET_OR_LOG(var)
+				break;
+			case body:
+				DICT_SET_OR_LOG(value)
+				break;
+			case flag:
+				DICT_SET_OR_LOG(flag)
+				break;
+			case exported:
+				DICT_SET_OR_LOG(exp)
+				break;
+			default:
+				log_warn("invalid config type '%d'", n->type);
+		}
+	}
+
+#undef DICT_SET_OR_LOG
+
+	ast_handleData(ast,
+	               statements,
+	               filename,
+	               lineno,
+	               groupd);
+
+error:
+	if (groupd) {
+		Py_DECREF(groupd);
+	}
+}
+
+static void compat_handle_method(struct ast *ast,
+                                 GNode *node,
+                                 PyObject *statements,
+                                 const gchar *filename) {
+	GNode *child = NULL;
+	struct node_int *n = NULL;
+	gint lineno = -1;
+
+	n = child->data;
+	lineno = n->lineno;
+	log_warn("FUNC: file '%s':'%d', '%d'", filename, lineno, n->type);
+
+	for (child = node->children;
+	     child != NULL;
+	     child = g_node_next_sibling(child)) {
+		n = child->data;
+		log_warn("FUNC: file '%s':'%d', '%d'", filename, lineno, n->type);
+	}
+}
+
+static void handle_node(struct ast *ast,
+                        GNode *entry,
+                        PyObject *statements,
+                        gchar *filename) {
+	struct node_int *internal = NULL;
+
+	G_DEBUG_HERE();
 
 	internal = entry->data;
-	type = internal->type;
 
-	num_args = types_get_ast_num_args(type);
-
-	args = PyTuple_New(num_args);
-	if (args == NULL) {
-		log_warn("failed to create ast args");
-		return NULL;
+// Export
+// Unset
+// BBHandlers
+// Inherit
+	switch (internal->type) {
+		case conf:
+			log_dbg("data");
+			compat_handle_data(ast,
+			                   entry,
+			                   statements,
+			                   filename);
+			break;
+		case inherit:
+			log_dbg("inherit");
+			compat_handle_common(ast,
+			                     entry,
+			                     statements,
+			                     filename);
+			break;
+		case exported:
+			log_dbg("export");
+			compat_handle_common(ast,
+			                     entry,
+			                     statements,
+			                     filename);
+			break;
+		case unset:
+			log_dbg("unset");
+			compat_handle_common(ast,
+			                     entry,
+			                     statements,
+			                     filename);
+			break;
+		default:
+			log_warn("unhandled type '%d'", internal->type);
 	}
-
-	r = ast_request_add_generic(args, statements, filename, internal->lineno);
-	if (r != 0) {
-		log_warn("failed to append generic information");
-		return NULL;
-	}
-
-	return ast_finalize_request(args, entry, type, filename);
 }
 
-gint bbcompat_call_bbast(GNode *root,
-                         PyObject *statements,
-                         gchar *filename) {
+gint compat_call_bbast(struct ast *ast,
+                       GNode *root,
+                       PyObject *statements,
+                       gchar *filename) {
 	GNode *child = NULL;
-	GList *func_and_args = NULL;
 	AstHandleFunc ast_handler = NULL;
 	PyObject *ast_args = NULL;
 
@@ -349,18 +229,7 @@ gint bbcompat_call_bbast(GNode *root,
 	for (child = root->children;
 	     child != NULL;
 	     child = g_node_next_sibling(child)) {
-		func_and_args = form_bbast_callbacks(child,
-		                                     statements,
-		                                     filename);
-		if (func_and_args == NULL) {
-			log_warn("invalid AST data");
-			return -1;
-		}
-
-		ast_handler = func_and_args->data;
-		ast_args = func_and_args->next->data;
-
-		ast_handler(ast_args);
+		handle_node(ast, child, statements, filename);
 	}
 
 	return 0;

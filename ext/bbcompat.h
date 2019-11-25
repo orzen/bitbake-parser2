@@ -4,9 +4,11 @@
 #include <glib.h>
 #include <Python.h>
 
-gint bbcompat_call_bbast(GNode *root,
-                         PyObject *statements,
-                         const gchar *filename);
-//PyObject* convert_seq_to_pylist(gchar *fmt, ...);
+#include "pyo_ast2.h"
+
+gint compat_call_bbast(struct ast *ast,
+                       GNode *root,
+                       PyObject *statements,
+                       const gchar *filename);
 
 #endif

@@ -3,7 +3,49 @@
 #include <unistd.h>
 
 #include "log.h"
-#include "pyobj_d.h"
+#include "pyo_d.h"
+
+#if 0
+PyObject* pyu_import_module(const gchar *module_name) {
+	PyObject *module = NULL;
+
+	module = PyImport_ImportModule(module_name);
+	if (module != NULL) {
+		*obj = module;
+		return 0;
+	}
+
+	log_warn("failed to import module '%s'", module_name);
+	return -1;
+}
+
+static gint import_modules(GHashTable *modules, gint num, ...) {
+	va_list ap;
+	PyObject *module = NULL;
+	gchar *module_name = NULL;
+	gint r = 0;
+	gint i = 0;
+
+	va_start(ap, 0);
+	for (i = 0; i < num; i++) {
+		module_name = va_arg(ap, char*);
+		if (pyu_import_module(&module, module_name) != 0) {
+			return -1;
+		}
+
+
+		if (!g_hash_table_insert(modules,
+					 g_strdup(module_name),
+					 module)) {
+			g_warning("failed to store module '%s' in hashtable", module_name);
+			return = -1;
+		}
+	}
+	va_end(ap);
+
+	return 0;
+}
+#endif
 
 void cbb_print_pyobj(const gchar *filename, PyObject *o) {
 	FILE *fd = NULL;
@@ -16,24 +58,6 @@ void cbb_print_pyobj(const gchar *filename, PyObject *o) {
 	fclose(fd);
 }
 
-void cbb_init(PyObject *d) {
-	PyObject *topdir = NULL;
-	gchar buf[2048];
-	gchar *cwd = NULL;
-
-	if (d == NULL) {
-		return;
-	}
-
-	topdir = cbb_d_get_var(d, "TOPDIR", 0);
-	if (topdir == Py_None) {
-		printf("set TOPDIR\n");
-		cwd = getcwd(buf, sizeof(buf));
-
-		cbb_d_set_var(d, "TOPDIR", cwd);
-	}
-}
-
 PyObject* pyutils_get_method(PyObject *module, const gchar *method_str) {
 	PyObject *method = NULL;
 
@@ -44,7 +68,7 @@ PyObject* pyutils_get_method(PyObject *module, const gchar *method_str) {
 
 	method = PyObject_GetAttrString(module, method_str);
 	if (method == NULL) {
-		g_warning("failed to get method '%s'", method_str);
+		log_warn("failed to get method '%s'", method_str);
 		return NULL;
 	}
 
@@ -110,7 +134,7 @@ gchar* cbb_resolve_file(const gchar *filename, PyObject *d) {
 	}
 
 	if (!g_path_is_absolute(filename)) {
-		bbpath = cbb_d_get_var(d, "BBPATH", 1);
+		bbpath = pyo_d_get_var(d, "BBPATH", 1);
 
 		method = get_method_from_module("bb.utils", "which");
 		if (method == NULL) {

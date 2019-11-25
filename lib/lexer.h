@@ -19,6 +19,6 @@ int yylex(YYSTYPE *yylval, yyscan_t yyscanner);
 void yyerror(yyscan_t yyscanner, GNode **acc, const gchar *err);
 int yyparse(yyscan_t yyscanner, GNode **acc);
 
-GNode* cbb_parse_file(const gchar *fn);
+GNode* parse_file(const gchar *fn);
 
 #endif

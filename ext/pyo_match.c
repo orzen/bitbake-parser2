@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include "log.h"
+#include "pylog.h"
 
 static const gchar *PACKAGE_VERSION = "0.0.1";
 static PyObject *REMOCK_ERROR;
@@ -20,13 +21,13 @@ static PyObject* Match_group(struct match_data *self, PyObject *args) {
 	gint r = -1;
 
 	if (self == NULL || args == NULL) {
-		py_err(REMOCK_ERROR, "one or more of the arguments is NULL");
+		log_warn("empty args")
 		return Py_None;
 	}
 
 	r = PyArg_ParseTuple(args, "O", &index);
 	if (r != 0) {
-		py_err(REMOCK_ERROR, "failed to parse args");
+		log_warn("failed to parse args");
 		return Py_None;
 	}
 
@@ -45,13 +46,13 @@ static PyObject* Match_group(struct match_data *self, PyObject *args) {
 
 		value = PyList_GetItem(self->list, idx);
 		if (value == NULL) {
-			py_err(REMOCK_ERROR, "failed to get match value (list)");
+			log_warn("failed to get match value (list)");
 			return Py_None;
 		}
 	} else {
 		value = PyDict_GetItem(self->dict, index);
 		if (value == NULL) {
-			py_err(REMOCK_ERROR, "failed to get match value (dict)");
+			log_warn("failed to get match value (dict)");
 			return Py_None;
 		}
 	}
@@ -61,7 +62,7 @@ static PyObject* Match_group(struct match_data *self, PyObject *args) {
 
 static PyObject* Match_groupdict(struct match_data *self) {
 	if (self == NULL) {
-		py_err(REMOCK_ERROR, "empty args");
+		log_warn("empty args");
 		return Py_None;
 	}
 
@@ -69,7 +70,7 @@ static PyObject* Match_groupdict(struct match_data *self) {
 }
 
 static void Match_dealloc(struct match_data *self) {
-	log_debug();
+	log_dbg();
 
 	Py_XDECREF(self->dict);
 	Py_XDECREF(self->list);
@@ -82,7 +83,7 @@ static gint Match_init(struct match_data *self, PyObject *args, PyObject *kwds) 
 	PyObject *list = NULL;
 	gint r = -1;
 
-	log_debug("__INIT__");
+	log_dbg("__INIT__");
 
 	if (args == NULL) {
 		py_err(REMOCK_ERROR, "empty args");
@@ -104,7 +105,7 @@ static gint Match_init(struct match_data *self, PyObject *args, PyObject *kwds) 
 static PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 	struct match_data *self = NULL;
 
-	log_debug("__NEW__");
+	log_dbg("__NEW__");
 
 	self = (struct match_data *) type->tp_alloc(type, 0);
 	if (self != NULL) {
@@ -166,7 +167,7 @@ static PyObject* remock_compile(PyObject *self, PyObject *args) {
 	gchar *pattern = NULL;
 	gint r = -1;
 
-	log_debug("");
+	log_dbg("");
 
 	r = PyArg_ParseTuple(args, "s", &pattern);
 	if (r == 0) {

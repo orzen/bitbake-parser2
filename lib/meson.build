@@ -24,15 +24,13 @@ d_glib = dependency('glib-2.0')
 deps = [d_glib]
 
 headers = [
-	'args.h',
 	'files.h',
 	'log.h',
-	'node.h'
+	'node.h',
 	'parser_types.h'
 ]
 
 sources = [
-	'args.c',
 	'files.c',
 	'log.c',
 	'node.c',
@@ -41,4 +39,7 @@ sources = [
 	bfiles
 ]
 
-libparser = shared_library('libparser', sources, dependencies: deps)
+libparser = static_library('parser', sources, dependencies: deps,
+                           c_args: ['-O0', '-ggdb3'])
+
+#libparser = shared_library('libparser', sources, dependencies: deps)

@@ -10,7 +10,7 @@ gint main(gint argc, gchar **argv) {
 	for (i = 1; i < argc; i++) {
 		GNode *root = NULL;
 		printf("arg[%d]: '%s'\n", i, argv[i]);
-		root = cbb_parse_file(argv[i]);
-		//node_print_tree(root);
+		root = parse_file(argv[i]);
+		node_print_tree(root);
 	}
 }

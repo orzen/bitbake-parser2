@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <glib.h>
 
-#include "args.h"
 #include "files.h"
 #include "node.h"
 #include "parser_types.h"
