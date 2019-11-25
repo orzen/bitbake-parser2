@@ -17,10 +17,11 @@
 PyObject* ast_##NAME(struct ast *ast, ...) { \
 	PyObject *args = NULL; \
 	PyObject *ret = NULL; \
-	const char fmt[] = #FMT; \
+	const gchar *fmt = #FMT; \
+	size_t size = strlen(fmt); \
 	va_list ap; \
  \
-	va_start(ap, fmt); \
+	va_start(ap, size); \
 	args = Py_VaBuildValue(fmt, ap); \
 	va_end(ap); \
  \
@@ -149,6 +150,7 @@ error:
 
 void ast_free(struct ast *a) {
 	struct methods *m = NULL;
+
 	if (!a) {
 		log_warn("trying to free an empty ast");
 		return;

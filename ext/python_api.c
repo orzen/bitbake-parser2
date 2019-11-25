@@ -1,7 +1,6 @@
 #include <glib.h>
 #include <strings.h>
 #include <stdio.h>
-#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include "bbcompat.h"
@@ -153,16 +152,6 @@ static PyObject* api_handle(PyObject *self, PyObject *args) {
 	return Py_BuildValue("");
 }
 
-// TODO these are dependencies that needs to be implemented
-//bb.parse.BBHandler.cached_statements = {}
-//bb.parse.BBHandler.inherit
-//bb.parse.ConfHandler.include
-
-static PyMethodDef bbcparser_methods[] = {
-	{"handle",  api_handle, METH_VARARGS, "Parsing a given file and returning AstNodes for ast.py"},
-	{NULL, NULL, 0, NULL} /* Sentinel */
-};
-
 void state_free() {
 	if (S) {
 		if (S->ast) {
@@ -236,6 +225,16 @@ error:
 	ast_free(S->ast);
 	state_free();
 }
+
+// TODO these are dependencies that needs to be implemented
+//bb.parse.BBHandler.cached_statements = {}
+//bb.parse.BBHandler.inherit
+//bb.parse.ConfHandler.include
+
+static PyMethodDef bbcparser_methods[] = {
+	{"handle",  api_handle, METH_VARARGS, "Parsing a given file and returning AstNodes for ast.py"},
+	{NULL, NULL, 0, NULL} /* Sentinel */
+};
 
 static struct PyModuleDef bbcparser_module = {
 	PyModuleDef_HEAD_INIT,
