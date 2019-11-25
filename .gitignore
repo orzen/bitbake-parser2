@@ -1,0 +1,7 @@
+build
+lib/lex.yy.c
+lib/parser.output
+lib/parser.tab.c
+lib/parser.tab.h
+pytest/__pycache__
+venv
