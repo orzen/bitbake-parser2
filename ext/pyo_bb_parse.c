@@ -34,7 +34,7 @@ const gchar* bb_parse_resolve_file(PyObject *bb_parse,
 		return NULL;
 	}
 
-	ret = PyUnicode_AS_DATA(abs_fn);
+	ret = PyUnicode_AsUTF8(abs_fn);
 	log_dbg("resolved file '%s'", ret);
 
 	Py_DECREF(resolve_file);

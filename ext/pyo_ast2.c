@@ -24,6 +24,10 @@ PyObject* ast_##NAME(struct ast *ast, ...) { \
 	va_start(ap, size); \
 	args = Py_VaBuildValue(fmt, ap); \
 	va_end(ap); \
+	if (args == NULL) {\
+		log_warn("failed to prepare args for ast '%s'", #NAME); \
+		return NULL; \
+	}\
  \
 	ret = PyObject_CallObject(ast->methods->NAME, args); \
 	if (ret == NULL) { \

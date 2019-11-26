@@ -16,7 +16,7 @@
 	}
 
 #define DICT_SET_OR_LOG(NAME) \
-	if (PyDict_SetItemString(groupd, "##NAME##", child->data) != 0) { \
+	if (PyDict_SetItemString(groupd, "##NAME##", data) != 0) { \
 		log_warn("failed to add '##NAME##' to groupd"); \
 	}
 
@@ -91,8 +91,6 @@ static void compat_handle_data(struct ast *ast,
 		goto error;
 	}
 
-	G_DEBUG_HERE();
-
 	n = node->data;
 	lineno = n->lineno;
 	data = n->data;
@@ -113,21 +111,30 @@ static void compat_handle_data(struct ast *ast,
 	     child != NULL;
 	     child = g_node_next_sibling(child)) {
 		n = child->data;
+		PyObject *data = NULL;
 		switch (n->type) {
 			case var:
+				data = PyUnicode_FromString(n->data);
 				DICT_SET_OR_LOG(var)
 				break;
 			case body:
+				data = PyUnicode_FromString(n->data);
 				DICT_SET_OR_LOG(value)
 				break;
 			case flag:
+				data = PyUnicode_FromString(n->data);
 				DICT_SET_OR_LOG(flag)
 				break;
 			case exported:
+				data = PyBool_FromLong(n->data);
 				DICT_SET_OR_LOG(exp)
 				break;
 			default:
 				log_warn("invalid config type '%d'", n->type);
+		}
+		if (data) {
+			Py_DECREF(data);
+			data = NULL;
 		}
 	}
 

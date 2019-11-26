@@ -8,8 +8,9 @@
 #include "lexer.h"
 #include "log.h"
 #include "pyo_ast2.h"
-#include "pyo_d.h"
 #include "pyo_bb_parse.h"
+#include "pyo_d.h"
+#include "pyo_match.h"
 #include "python_utils.h"
 #include "node.h"
 
@@ -24,6 +25,8 @@
 	__residue__
 	__classname__
 #endif
+
+static const gchar *PACKAGE_VERSION = "0.0.1";
 
 struct state {
 	GList *body;
@@ -192,7 +195,7 @@ void state_new() {
 
 	G_DEBUG_HERE();
 
-	S->err = PyErr_NewException("bb_cparser.error", NULL, NULL);
+	S->err = PyErr_NewException("bbcparser.error", NULL, NULL);
 	Py_INCREF(S->err);
 
 	S->ast = ast_new();
@@ -241,15 +244,23 @@ static struct PyModuleDef bbcparser_module = {
 	.m_name = "bbcparser",   /* name of module */
 	.m_doc = "A C implementation of bitbake's parse.BBHandler", /* module documentation, may be NULL */
 	.m_size = -1, /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
-	.m_methods = bbcparser_methods
+	.m_methods = bbcparser_methods,
+	.m_slots = NULL,
+	.m_traverse = NULL,
+	.m_clear = NULL,
+	.m_free = module_free
 };
-//	.m_slots = NULL,
-//	.m_traverse = NULL,
-//	.m_clear = NULL,
-//	.m_free = module_free
 
 PyMODINIT_FUNC PyInit_bbcparser() {
 	PyObject *m = NULL;
+	gint r = -1;
+
+	r = PyType_Ready(&Match_type);
+	if (r < 0) {
+
+		log_warn("");
+		goto out;
+	}
 
 	m = PyModule_Create(&bbcparser_module);
 	if (m == NULL) {
@@ -257,9 +268,29 @@ PyMODINIT_FUNC PyInit_bbcparser() {
 		goto out;
 	}
 
-	state_new();
+	r = PyModule_AddStringConstant(m, "__version__", PACKAGE_VERSION);
+	if (r != 0) {
+		Py_DECREF(m);
+		return NULL;
+	}
 
-	PyModule_AddObject(m, "error", S->err);
+	r = PyModule_AddObject(m, "error", S->err);
+	if (r != 0) {
+		log_warn("failed to add error object")
+		goto out;
+	}
+
+	//Py_INCREF(&Match_type);
+	r = PyModule_AddObject(m, "Match", (PyObject *) &Match_type);
+	if (r != 0) {
+		log_warn("failed to add Match object");
+		Py_DECREF(&Match_type);
+		Py_DECREF(m);
+
+		return NULL;
+	}
+
+	state_new();
 
 	return m;
 
