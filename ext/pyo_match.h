@@ -17,6 +17,7 @@ PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 void Match_dealloc(struct match_data *self);
 
 PyTypeObject Match_type;
+PyMemberDef Match_members;
 
 PyObject* Match_new_int(PyObject *dict, PyObject *list);
 

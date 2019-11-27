@@ -1,6 +1,7 @@
 #include <glib.h>
 #include <strings.h>
 #include <stdio.h>
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include "bbcompat.h"
@@ -234,6 +235,27 @@ error:
 //bb.parse.BBHandler.inherit
 //bb.parse.ConfHandler.include
 
+PyMethodDef Match_methods[] = {
+	{"group", (PyCFunction) Match_group, METH_VARARGS, "Stubbed alternative for Match.group"},
+	{"groupdict", (PyCFunction) Match_groupdict, METH_NOARGS, "Stubbed alternative for Match.groupdict"},
+	{NULL, NULL, 0, NULL} /* Sentinel */
+};
+
+PyTypeObject Match_type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	.tp_name = "bbcparser.Match",
+	.tp_doc = "Stubbed version of re's Match-object",
+	.tp_basicsize = sizeof(struct match_data),
+	.tp_itemsize = 0,
+	.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+	.tp_new = Match_new,
+	.tp_init = (initproc) Match_init,
+	.tp_dealloc = (destructor) Match_dealloc,
+	.tp_alloc = PyType_GenericAlloc,
+	.tp_members = Match_members,
+	.tp_methods = Match_methods,
+};
+
 static PyMethodDef bbcparser_methods[] = {
 	{"handle",  api_handle, METH_VARARGS, "Parsing a given file and returning AstNodes for ast.py"},
 	{NULL, NULL, 0, NULL} /* Sentinel */
@@ -255,10 +277,11 @@ PyMODINIT_FUNC PyInit_bbcparser() {
 	PyObject *m = NULL;
 	gint r = -1;
 
-	r = PyType_Ready(&Match_type);
-	if (r < 0) {
+	log_warn("Match_type.tp_name '%s'", Match_type.tp_name);
 
-		log_warn("");
+	r = PyType_Ready(&Match_type);
+	if (r != 0) {
+		log_warn("match type is not ready");
 		goto out;
 	}
 

@@ -114,25 +114,6 @@ PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 	return (PyObject*) self;
 }
 
-PyMethodDef Match_methods[] = {
-	{"group", (PyCFunction) Match_group, METH_VARARGS, "Stubbed alternative for Match.group"},
-	{"groupdict", (PyCFunction) Match_groupdict, METH_NOARGS, "Stubbed alternative for Match.groupdict"},
-	{} /* sentinel */
-};
-
-PyTypeObject Match_type = {
-	PyVarObject_HEAD_INIT(NULL, 0)
-	.tp_name = "bbcparser.Match",
-	.tp_basicsize = sizeof(struct match_data),
-	.tp_flags = Py_TPFLAGS_DEFAULT,
-	.tp_doc = "Stubbed version of re's Match-object",
-	.tp_init = (initproc) Match_init,
-	.tp_new = Match_new,
-	.tp_alloc = PyType_GenericAlloc,
-	.tp_dealloc = (destructor) Match_dealloc,
-	.tp_methods = Match_methods,
-};
-
 #if 0
 static PyObject* remock_compile(PyObject *self, PyObject *args) {
 	PyObject *match_args = NULL;

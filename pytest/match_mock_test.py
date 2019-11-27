@@ -1,4 +1,4 @@
-from bbcparser import Match
+import bbcparser.Match
 
 def test_match_mock():
     m = Match()
