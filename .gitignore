@@ -5,3 +5,5 @@ lib/parser.tab.c
 lib/parser.tab.h
 pytest/__pycache__
 venv
+tags
+core

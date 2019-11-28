@@ -3,7 +3,7 @@ py3 = py_mod.find_installation()
 py3_dep = py3.dependency(required: true)
 
 d_glib = dependency('glib-2.0')
-d_python = dependency('python-3.7-dbg')
+d_python = dependency('python-3.8-dbg')
 
 deps = [d_glib, d_python]
 

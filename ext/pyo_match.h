@@ -3,7 +3,7 @@
 
 #include <Python.h>
 
-struct match_data {
+typedef struct match_data {
 	PyObject_HEAD
 	PyObject *dict;
 	PyObject *list;
@@ -17,7 +17,6 @@ PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 void Match_dealloc(struct match_data *self);
 
 PyTypeObject Match_type;
-PyMemberDef Match_members;
 
 PyObject* Match_new_int(PyObject *dict, PyObject *list);
 

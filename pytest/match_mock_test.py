@@ -1,6 +1,6 @@
-import bbcparser.Match
+from bbcparser import Match
 
 def test_match_mock():
-    m = Match()
+    m = Match({}, [])
     pass
 

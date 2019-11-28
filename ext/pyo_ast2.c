@@ -11,7 +11,7 @@
 	if ((METHODS->HANDLER = pyutils_get_method(AST, #HANDLER)) == NULL) goto error;
 
 #define FREE_IF_SET(NAME) \
-	if (NAME) g_free(NAME);
+	if (NAME) Py_DECREF(NAME);
 
 #define GEN_AST_HANDLER(NAME, FMT) \
 PyObject* ast_##NAME(struct ast *ast, ...) { \
@@ -36,6 +36,12 @@ PyObject* ast_##NAME(struct ast *ast, ...) { \
 	Py_DECREF(args); \
 	return ret; \
 }
+
+#if defined(TESTING)
+#define AST_MOD "ast_mock"
+#else
+#define AST_MOD "bb.parse.ast"
+#endif
 
 // args: statements, filename, lineno, func_name, body, python, fakeroot
 GEN_AST_HANDLER(handleMethod, Osisspp)
@@ -106,7 +112,8 @@ struct ast* ast_new() {
 	}
 
 	// Import ast.py
-	mod = PyImport_ImportModule("bb.parse.ast");
+	log_dbg("using ast module '%s'", AST_MOD);
+	mod = PyImport_ImportModule(AST_MOD);
 	if (!mod) {
 		log_warn("failed to import ast");
 		goto error;

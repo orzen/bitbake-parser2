@@ -12,14 +12,14 @@ PyObject* Match_group(struct match_data *self, PyObject *args) {
 	gint r = -1;
 
 	if (self == NULL || args == NULL) {
-		log_warn("empty args")
-		return Py_None;
+		log_warn("empty args");
+		Py_RETURN_NONE;
 	}
 
 	r = PyArg_ParseTuple(args, "O", &index);
-	if (r != 0) {
+	if (r != Py_True) {
 		log_warn("failed to parse args");
-		return Py_None;
+		Py_RETURN_NONE;
 	}
 
 	act_list = PyLong_Check(index);
@@ -38,13 +38,13 @@ PyObject* Match_group(struct match_data *self, PyObject *args) {
 		value = PyList_GetItem(self->list, idx);
 		if (value == NULL) {
 			log_warn("failed to get match value (list)");
-			return Py_None;
+			Py_RETURN_NONE;
 		}
 	} else {
 		value = PyDict_GetItem(self->dict, index);
 		if (value == NULL) {
 			log_warn("failed to get match value (dict)");
-			return Py_None;
+			Py_RETURN_NONE;
 		}
 	}
 
@@ -79,18 +79,27 @@ gint Match_init(struct match_data *self, PyObject *args, PyObject *kwds) {
 	}
 
 	self->dict = dict;
+	Py_INCREF(self->dict);
 	self->list = list;
+	Py_INCREF(self->list);
 
 	return 0;
 }
 
 void Match_dealloc(struct match_data *self) {
-	log_dbg();
+	log_dbg("__DEALLOC__");
 
-	Py_XDECREF(self->dict);
-	Py_XDECREF(self->list);
+	if (self->dict) {
+		Py_DECREF(self->dict);
+	}
+	log_dbg("__DEALLOC__1");
+	if (self->list) {
+		Py_DECREF(self->list);
+	}
+	log_dbg("__DEALLOC__2");
 
 	Py_TYPE(self)->tp_free((PyObject*) self);
+	log_dbg("__DEALLOC__3");
 }
 
 PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
@@ -99,6 +108,10 @@ PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 	log_dbg("__NEW__");
 
 	self = (struct match_data *) type->tp_alloc(type, 0);
+	if (self == NULL) {
+		log_warn("failed to allocate match_data");
+	}
+#if 0
 	if (self != NULL) {
 		self->dict = PyDict_New();
 		if (self->dict == NULL) {
@@ -110,67 +123,17 @@ PyObject* Match_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 			log_warn("failed to allocate list for Match object");
 		}
 	}
+#endif
 
 	return (PyObject*) self;
 }
-
-#if 0
-static PyObject* remock_compile(PyObject *self, PyObject *args) {
-	PyObject *match_args = NULL;
-	PyObject *match_kwds = NULL;
-	PyObject *match_obj = NULL;
-	gchar *pattern = NULL;
-	gint r = -1;
-
-	log_dbg("");
-
-	r = PyArg_ParseTuple(args, "s", &pattern);
-	if (r == 0) {
-		PyErr_SetString(REMOCK_ERROR, "Failed to parse args");
-		return NULL;
-	}
-
-	match_args = Py_BuildValue("");
-	match_kwds = PyDict_New();
-
-	match_obj = Match_new(&Match_type, match_args, match_kwds);
-
-	Py_DECREF(match_args);
-	Py_DECREF(match_kwds);
-
-	if (match_obj == NULL) {
-		PyErr_SetString(REMOCK_ERROR, "Failed to create a match object");
-		return NULL;
-	}
-
-	return match_obj;
-}
-
-static PyObject* remock_match(PyObject *self, PyObject *args) {
-	//gchar **tmp_arr = NULL;
-
-	return NULL;
-	tmp_arr = g_strsplit(tmp, " ", -1);
-	if (tmp_arr == NULL) {
-		return NULL;
-	}
-
-	if (self->string_arr != NULL) {
-		g_strfreev(self->string_arr);
-		self->string_arr = NULL;
-	}
-
-	self->string_arr = tmp_arr;
-}
-#endif
-
 
 PyObject* Match_new_int(PyObject *dict, PyObject *list) {
 	PyObject *match_args = NULL;
 	PyObject *match_kwds = NULL;
 	PyObject *match_obj = NULL;
 
-	match_args = Py_BuildValue("OO",
+	match_args = Py_BuildValue("(OO)",
 	                           dict ? dict : Py_None,
 	                           list ? list : Py_None);
 	match_kwds = PyDict_New();

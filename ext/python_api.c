@@ -45,8 +45,8 @@ struct state {
 static struct state *S;
 
 static PyObject* get_statements(const gchar *filename,
-                           const gchar *abs_filename,
-                           const gchar *basename) {
+                                const gchar *abs_filename,
+                                const gchar *basename) {
 	GNode *parse_result;
 	PyObject *statements;
 	gint r = -1;
@@ -235,7 +235,15 @@ error:
 //bb.parse.BBHandler.inherit
 //bb.parse.ConfHandler.include
 
-PyMethodDef Match_methods[] = {
+#if 0
+static PyMemberDef Match_members[] = {
+	{"dict", T_OBJECT_EX, offsetof(MatchData, dict), 0, "content in dict form"},
+	{"list", T_OBJECT_EX, offsetof(MatchData, list), 0, "content in list form"},
+	{NULL} /* sentinel */
+};
+#endif
+
+static PyMethodDef Match_methods[] = {
 	{"group", (PyCFunction) Match_group, METH_VARARGS, "Stubbed alternative for Match.group"},
 	{"groupdict", (PyCFunction) Match_groupdict, METH_NOARGS, "Stubbed alternative for Match.groupdict"},
 	{NULL, NULL, 0, NULL} /* Sentinel */
@@ -252,9 +260,9 @@ PyTypeObject Match_type = {
 	.tp_init = (initproc) Match_init,
 	.tp_dealloc = (destructor) Match_dealloc,
 	.tp_alloc = PyType_GenericAlloc,
-	.tp_members = Match_members,
 	.tp_methods = Match_methods,
 };
+	//.tp_members = Match_members,
 
 static PyMethodDef bbcparser_methods[] = {
 	{"handle",  api_handle, METH_VARARGS, "Parsing a given file and returning AstNodes for ast.py"},
@@ -285,23 +293,29 @@ PyMODINIT_FUNC PyInit_bbcparser() {
 		goto out;
 	}
 
+	G_DEBUG_HERE();
+
 	m = PyModule_Create(&bbcparser_module);
 	if (m == NULL) {
 		log_warn("failed to create module");
 		goto out;
 	}
+	G_DEBUG_HERE();
 
 	r = PyModule_AddStringConstant(m, "__version__", PACKAGE_VERSION);
 	if (r != 0) {
 		Py_DECREF(m);
 		return NULL;
 	}
+	G_DEBUG_HERE();
+	state_new();
 
 	r = PyModule_AddObject(m, "error", S->err);
 	if (r != 0) {
 		log_warn("failed to add error object")
 		goto out;
 	}
+	G_DEBUG_HERE();
 
 	//Py_INCREF(&Match_type);
 	r = PyModule_AddObject(m, "Match", (PyObject *) &Match_type);
@@ -313,7 +327,6 @@ PyMODINIT_FUNC PyInit_bbcparser() {
 		return NULL;
 	}
 
-	state_new();
 
 	return m;
 
